@@ -139,6 +139,25 @@ Important: the frontend currently uses mock APIs from `frontend/src/lib/mockApi.
 
 ## Current Local Demo Paths
 
+One-command startup (recommended):
+
+```bash
+./start.sh
+```
+
+The script starts both backend agents and the frontend dev server, and stops all of them on `Ctrl+C`.
+
+Port overrides:
+
+```bash
+DATA_ENGINEER_PORT=8012 TRANSLATION_PORT=8013 FRONTEND_PORT=5174 ./start.sh
+```
+
+Prerequisites for `start.sh`:
+
+- Python virtualenv at `env/` with backend dependencies installed
+- frontend dependencies installed (`frontend/node_modules`)
+
 For the visual frontend demo:
 
 ```bash
