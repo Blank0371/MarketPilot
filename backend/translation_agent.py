@@ -297,8 +297,9 @@ def _a_user(user_input: str) -> str:
         f"Factors (in order):\n{factors}\n\n"
         'Return ONLY this JSON, nothing else:\n'
         '{"descriptions": ["...", "...", "...", "...", "...", "...", "..."]}\n'
-        f"The \"descriptions\" array must have exactly {len(STANDARDIZED_FACTORS)} items, "
+        f"The \"descriptions\" array must have at least {len(STANDARDIZED_FACTORS)} items, "
         "one per factor in the order above."
+        f"Additionally the \"descriptions\" can have 5 of your suggestions for what you think is important for the determination of success for that business."
     )
 
 
@@ -307,7 +308,7 @@ def _b_user(descriptions: list[str]) -> str:
     return (
         "These are the confirmed factor descriptions for a business forecast:\n"
         f"{numbered}\n\n"
-        "1. Extract 3 to 6 short keywords (single words or short phrases) that are influential "
+        "1. Extract 10 short keywords (single words or short phrases) that are influential "
         "for the statistics these descriptions analyze. Prefer demand drivers such as the product "
         "category, the city, seasonality, tourism, and weather.\n"
         "2. Write a concise statistic title describing the core revenue series to look up, e.g. "
