@@ -1,30 +1,28 @@
-import { mockDescriptions, mockReport, BASELINE } from "./mockData";
+import { mockDescriptions, mockReport, ECONOMICS } from "./mockData";
 import type {
   DescriptionsPayload,
   ConfirmResponse,
   JobStatus,
   PipelineStep,
   Report,
-  WhatIfOverrides,
-  DecisionLabel,
+  OverridesMap,
+  ComparisonResult,
+  ComparisonSummary,
+  ChangedAssumption,
+  AddMarketFactorResult,
+  AddedMarketFactor,
 } from "./types";
 
 const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
-// Tracks job start time so polling can simulate step advancement by elapsed time.
 const jobRegistry = new Map<string, number>();
 
 // ─── Extract ─────────────────────────────────────────────────────────────────
 
 /**
- * Extract standardized market-factor descriptions from a free-text business pitch.
- *
- * TODO: Replace with the real call:
- *   fetch('/api/extract', {
- *     method: 'POST',
- *     headers: { 'Content-Type': 'application/json' },
- *     body: JSON.stringify({ userInput }),
- *   }).then(r => r.json()) as Promise<DescriptionsPayload>
+ * TODO: Replace with real call:
+ *   fetch('/api/extract', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+ *     body: JSON.stringify({ userInput }) }).then(r => r.json()) as Promise<DescriptionsPayload>
  */
 export async function extract(userInput: string): Promise<DescriptionsPayload> {
   await delay(1100);
@@ -32,18 +30,12 @@ export async function extract(userInput: string): Promise<DescriptionsPayload> {
   return { descriptions: [...mockDescriptions] };
 }
 
-// ─── Confirm ─────────────────────────────────────────────────────────────────
+// ─── Confirm ──────────────────────────────────────────────────────────────────
 
 /**
- * Send the user-confirmed (edited) descriptions to the backend.
- * Returns a job_id for polling.
- *
- * TODO: Replace with the real call:
- *   fetch('/api/confirm', {
- *     method: 'POST',
- *     headers: { 'Content-Type': 'application/json' },
- *     body: JSON.stringify({ descriptions }),
- *   }).then(r => r.json()) as Promise<ConfirmResponse>
+ * TODO: Replace with real call:
+ *   fetch('/api/confirm', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+ *     body: JSON.stringify({ descriptions }) }).then(r => r.json()) as Promise<ConfirmResponse>
  */
 export async function confirm(descriptions: string[]): Promise<ConfirmResponse> {
   await delay(350);
@@ -53,7 +45,7 @@ export async function confirm(descriptions: string[]): Promise<ConfirmResponse> 
   return { job_id };
 }
 
-// ─── Status polling ──────────────────────────────────────────────────────────
+// ─── Status polling ───────────────────────────────────────────────────────────
 
 const STEP_SCHEDULE: Array<{ after_ms: number; step: PipelineStep }> = [
   { after_ms: 0, step: "extracting" },
@@ -64,31 +56,24 @@ const STEP_SCHEDULE: Array<{ after_ms: number; step: PipelineStep }> = [
 ];
 
 /**
- * Poll the pipeline status for a given job.
- * Steps advance based on elapsed time since job creation.
- *
- * TODO: Replace with the real call:
+ * TODO: Replace with real call:
  *   fetch(`/api/status/${job_id}`).then(r => r.json()) as Promise<JobStatus>
  */
 export async function getStatus(job_id: string): Promise<JobStatus> {
   await delay(300);
   const startedAt = jobRegistry.get(job_id) ?? Date.now();
   const elapsed = Date.now() - startedAt;
-
   let step: PipelineStep = "extracting";
   for (const s of STEP_SCHEDULE) {
     if (elapsed >= s.after_ms) step = s.step;
   }
-
   return { job_id, step, done: step === "done" };
 }
 
 // ─── Result ───────────────────────────────────────────────────────────────────
 
 /**
- * Fetch the final report once the job reaches "done".
- *
- * TODO: Replace with the real call:
+ * TODO: Replace with real call:
  *   fetch(`/api/result/${job_id}`).then(r => r.json()) as Promise<Report>
  */
 export async function getResult(job_id: string): Promise<Report> {
@@ -97,99 +82,244 @@ export async function getResult(job_id: string): Promise<Report> {
   return structuredClone(mockReport);
 }
 
-// ─── What-if recompute ────────────────────────────────────────────────────────
+// ─── What-if recalculation ────────────────────────────────────────────────────
 
 /**
- * Locally recompute the verdict and financials when the user adjusts assumptions.
- *
- * This is the decision intelligence layer: the same economics the backend runs,
- * but client-side for instant feedback.
- *
- * TODO: Point at a fast backend recompute endpoint when available:
- *   fetch('/api/recompute', {
- *     method: 'POST',
- *     body: JSON.stringify({ report, overrides }),
- *   }).then(r => r.json()) as Promise<Report>
+ * How demand multiplier changes by product_price_level.
+ * Higher price = fewer customers; lower price = more customers.
  */
-export function recompute(base: Report, overrides: WhatIfOverrides): Report {
-  const rent = overrides.monthly_rent ?? BASELINE.monthly_rent;
-  const basket = overrides.average_basket_price ?? BASELINE.average_basket_price;
-  const margin = (overrides.gross_margin_pct ?? BASELINE.gross_margin_pct) / 100;
+const DEMAND_MULT: Record<string, number> = {
+  budget: 1.25,
+  "mid-market": 1.05,
+  premium: 1.0,
+  luxury: 0.7,
+};
 
-  // Revenue scales linearly with basket price (same customer volume).
-  const new_revenue = BASELINE.customers_per_month * basket;
+/**
+ * Recalculate business metrics client-side from adjusted assumptions.
+ * Does NOT call Sybilion — the forecast stays fixed; only economics change.
+ *
+ * TODO: Wire to a fast backend recompute endpoint:
+ *   fetch('/api/recompute', { method: 'POST',
+ *     body: JSON.stringify({ base_report_id, overrides }) }).then(r => r.json())
+ * TODO: Add debouncing (e.g. 300ms) before calling the real backend to avoid
+ *       excessive requests during slider drags.
+ */
+export async function mockRecalculateWithOverrides(
+  baseReport: Report,
+  overrides: OverridesMap,
+): Promise<ComparisonResult> {
+  await delay(120); // simulate slight async
 
-  // Costs: variable COGS + fixed rent + fixed staff + fixed overhead.
+  // ── Read overrides (fall back to base values from ECONOMICS) ──────────────
+  const basket = (overrides["average_basket_size"] as number) ?? ECONOMICS.base_basket_size;
+  const margin = (overrides["gross_margin"] as number) ?? 0.35;
+  const staffing = (overrides["staffing_level"] as number) ?? 1;
+  const days = (overrides["opening_days_per_month"] as number) ?? ECONOMICS.base_opening_days;
+  const investment = (overrides["initial_investment_budget"] as number) ?? 120000;
+  const price_level = (overrides["product_price_level"] as string) ?? "premium";
+
+  const demand_mult = DEMAND_MULT[price_level] ?? 1.0;
+
+  // ── Revenue ───────────────────────────────────────────────────────────────
+  const new_revenue = Math.round(
+    ECONOMICS.daily_customers * basket * days * demand_mult,
+  );
+
+  // ── Costs ─────────────────────────────────────────────────────────────────
   const cogs = new_revenue * (1 - margin);
-  const new_costs = Math.round(cogs + rent + BASELINE.staff_costs + BASELINE.other_overhead);
-  const new_profit = Math.round(new_revenue - new_costs);
+  const staff_cost = staffing * ECONOMICS.staff_cost_per_employee;
+  const new_costs = Math.round(cogs + staff_cost + ECONOMICS.fixed_overhead);
+  const new_profit = new_revenue - new_costs;
   const profit_margin = new_revenue > 0 ? new_profit / new_revenue : -1;
 
-  // ── TODO (Learning opportunity) ──────────────────────────────────────────
-  // Implement the verdict derivation logic below (5-10 lines).
-  //
-  // You decide:
-  // - At what profit_margin threshold should the verdict flip to "Launch"?
-  // - When does it drop to "Delay" or "Do not launch"?
-  // - How should quality_score and confidence track with profitability?
-  //
-  // Hint: profit_margin = new_profit / new_revenue (e.g. 0.12 = 12% margin)
-  // ─────────────────────────────────────────────────────────────────────────
-  const label: DecisionLabel = deriveVerdict(profit_margin);
-  const score = Math.max(5, Math.min(95, Math.round(50 + profit_margin * 250)));
-  const confidence = Math.max(0.1, Math.min(0.95, parseFloat((0.5 + profit_margin * 1.5).toFixed(2))));
+  // ── Verdict ───────────────────────────────────────────────────────────────
+  const new_decision = deriveVerdict(profit_margin);
+  const new_risk = deriveRiskLevel(profit_margin);
+  const new_bep = Math.max(0.05, Math.min(0.97, 0.35 + profit_margin * 2.5));
+  const payback = new_profit > 0 ? Math.round(investment / new_profit) : 999;
+  void payback; // payback used in fuller reports; included here for completeness
 
-  const new_bep = Math.max(0.05, Math.min(0.97, parseFloat((0.35 + profit_margin * 2.5).toFixed(2))));
-  const payback =
-    new_profit > 0
-      ? Math.round(base.financials.estimated_initial_investment / new_profit)
-      : 999;
+  // ── Changed assumptions ───────────────────────────────────────────────────
+  const changes: ChangedAssumption[] = [];
+  if (Math.abs(basket - ECONOMICS.base_basket_size) > 0.01)
+    changes.push({ label: "Average basket size", old: ECONOMICS.base_basket_size, new: basket, unit: "EUR" });
+  if (Math.abs(margin - 0.35) > 0.001)
+    changes.push({ label: "Gross margin", old: 0.35, new: margin, unit: "%" });
+  if (staffing !== 1)
+    changes.push({ label: "Staffing level", old: 1, new: staffing, unit: "employees" });
+  if (days !== ECONOMICS.base_opening_days)
+    changes.push({ label: "Opening days per month", old: ECONOMICS.base_opening_days, new: days, unit: "days" });
+  if (Math.abs(investment - 120000) > 1)
+    changes.push({ label: "Initial investment budget", old: 120000, new: investment, unit: "EUR" });
+  if (price_level !== "premium")
+    changes.push({ label: "Product price level", old: "premium", new: price_level });
+
+  const baseline: ComparisonSummary = {
+    decision: baseReport.decision.label,
+    break_even_probability: baseReport.financials.break_even_probability,
+    expected_monthly_revenue: baseReport.financials.expected_monthly_revenue,
+    expected_monthly_profit: baseReport.financials.expected_monthly_profit,
+    risk_level: baseReport.decision.risk_level,
+  };
+
+  const adjusted: ComparisonSummary = {
+    decision: new_decision,
+    break_even_probability: Math.round(new_bep * 100) / 100,
+    expected_monthly_revenue: new_revenue,
+    expected_monthly_profit: new_profit,
+    risk_level: new_risk,
+  };
 
   return {
-    ...base,
-    decision: {
-      ...base.decision,
-      label,
-      score,
-      confidence,
-      summary: buildSummary(label, rent, basket, margin),
-    },
-    financials: {
-      ...base.financials,
-      expected_monthly_revenue: Math.round(new_revenue),
-      expected_monthly_costs: new_costs,
-      expected_monthly_profit: new_profit,
-      break_even_probability: new_bep,
-      payback_period_months: payback,
-    },
+    baseline,
+    adjusted,
+    changed_assumptions: changes,
+    impact_summary: buildWhatIfSummary(changes, baseline.decision, new_decision),
   };
 }
 
-/** Derive the decision label from the computed profit margin. */
-function deriveVerdict(profit_margin: number): DecisionLabel {
+// ─── Add market factor ────────────────────────────────────────────────────────
+
+/**
+ * Simulate adding a new external signal through the forecasting pipeline.
+ * In production this kicks off a Sybilion forecast job for the new factor.
+ *
+ * TODO: Replace with real call:
+ *   fetch('/api/add-factor', { method: 'POST',
+ *     body: JSON.stringify({ factor_description, base_job_id }) }).then(r => r.json())
+ * TODO: This should return a job_id that is polled for status, not a direct result.
+ */
+export async function mockAddMarketFactor(
+  factorDescription: string,
+  baseReport: Report,
+): Promise<AddMarketFactorResult> {
+  await delay(1600); // simulate forecast pipeline
+
+  const keywords = extractKeywords(factorDescription);
+  const impact = classifyImpact(factorDescription);
+
+  const new_revenue = Math.round(
+    baseReport.financials.expected_monthly_revenue * (1 + impact.revenue_delta_pct),
+  );
+  const new_profit = Math.round(
+    baseReport.financials.expected_monthly_profit
+    - impact.cost_increase_eur
+    + (new_revenue - baseReport.financials.expected_monthly_revenue) * 0.35,
+  );
+  const profit_margin = new_revenue > 0 ? new_profit / new_revenue : -1;
+  const new_decision = deriveVerdict(profit_margin);
+  const new_risk = deriveRiskLevel(profit_margin);
+  const new_bep = Math.max(
+    0.05,
+    Math.min(0.97, baseReport.financials.break_even_probability - impact.cost_increase_eur / 10000),
+  );
+
+  const baseline: ComparisonSummary = {
+    decision: baseReport.decision.label,
+    break_even_probability: baseReport.financials.break_even_probability,
+    expected_monthly_revenue: baseReport.financials.expected_monthly_revenue,
+    expected_monthly_profit: baseReport.financials.expected_monthly_profit,
+    risk_level: baseReport.decision.risk_level,
+  };
+
+  const adjusted: ComparisonSummary = {
+    decision: new_decision,
+    break_even_probability: Math.round(new_bep * 100) / 100,
+    expected_monthly_revenue: new_revenue,
+    expected_monthly_profit: new_profit,
+    risk_level: new_risk,
+  };
+
+  const reason = buildFactorReason(factorDescription, impact);
+
+  return {
+    status: "added",
+    factor: { description: factorDescription, keywords },
+    comparison: {
+      baseline,
+      adjusted,
+      added_factor: { description: factorDescription, keywords },
+      impact_summary: reason,
+    },
+    reason_for_update: reason,
+  };
+}
+
+// ─── Shared helpers ───────────────────────────────────────────────────────────
+
+function deriveVerdict(profit_margin: number): string {
   if (profit_margin > 0.15) return "Launch";
   if (profit_margin > 0.05) return "Adapt concept";
   if (profit_margin > 0) return "Delay";
   return "Do not launch";
 }
 
-function buildSummary(
-  label: DecisionLabel,
-  rent: number,
-  basket: number,
-  margin: number,
+function deriveRiskLevel(profit_margin: number): string {
+  if (profit_margin > 0.15) return "Low";
+  if (profit_margin > 0.08) return "Medium-low";
+  if (profit_margin > 0.03) return "Medium";
+  if (profit_margin > 0) return "Medium-high";
+  return "High";
+}
+
+function buildWhatIfSummary(
+  changes: ChangedAssumption[],
+  oldDecision: string,
+  newDecision: string,
 ): string {
-  const r = `€${rent.toLocaleString("en-US")}`;
-  const b = `€${basket.toFixed(2)}`;
-  const m = `${Math.round(margin * 100)}%`;
-  switch (label) {
-    case "Launch":
-      return `At ${r} rent, ${b} basket, and ${m} margin — the numbers work. Go.`;
-    case "Adapt concept":
-      return `Viable at ${b} basket and ${m} margin, but the model is tight — any cost overrun flips the verdict.`;
-    case "Delay":
-      return `Margins are too thin at these inputs. Push the basket price above ${b} or cut fixed costs before committing.`;
-    case "Do not launch":
-      return `These assumptions produce negative margins. Major changes to rent, pricing, or cost structure are required.`;
+  if (changes.length === 0) return "No assumptions were changed from the baseline.";
+  const labels = changes.map((c) => c.label.toLowerCase()).join(", ");
+  if (oldDecision === newDecision)
+    return `Adjusting ${labels} shifted the metrics but did not change the verdict.`;
+  return `Adjusting ${labels} changed the verdict from "${oldDecision}" to "${newDecision}".`;
+}
+
+function extractKeywords(description: string): string[] {
+  const STOP = new Set([
+    "a","an","the","for","in","of","at","to","by","and","or","with",
+    "from","that","this","on","as","is","are","was","were","per",
+  ]);
+  return [
+    ...new Set(
+      description
+        .toLowerCase()
+        .replace(/[^a-z\s]/g, " ")
+        .split(/\s+/)
+        .filter((w) => w.length >= 4 && !STOP.has(w)),
+    ),
+  ].slice(0, 5);
+}
+
+interface ImpactParams {
+  revenue_delta_pct: number;
+  cost_increase_eur: number;
+  type: "cost" | "demand" | "competition" | "neutral";
+}
+
+function classifyImpact(description: string): ImpactParams {
+  const d = description.toLowerCase();
+  if (/energy|utilities|overhead|expense|cost|electricity|rent/.test(d))
+    return { revenue_delta_pct: 0, cost_increase_eur: 1400, type: "cost" };
+  if (/demand|tourism|visitor|spend|footfall|traffic/.test(d))
+    return { revenue_delta_pct: 0.06, cost_increase_eur: 200, type: "demand" };
+  if (/competition|competitor|rival|market.saturation/.test(d))
+    return { revenue_delta_pct: -0.07, cost_increase_eur: 300, type: "competition" };
+  return { revenue_delta_pct: 0, cost_increase_eur: 900, type: "neutral" };
+}
+
+function buildFactorReason(description: string, impact: ImpactParams): string {
+  switch (impact.type) {
+    case "cost":
+      return `The added factor "${description}" increases expected operating costs, reducing monthly profit and lowering the break-even probability.`;
+    case "demand":
+      return `The added factor "${description}" reveals an additional demand signal that improves the revenue outlook.`;
+    case "competition":
+      return `The added factor "${description}" introduces competitive pressure, reducing the addressable customer base and lowering revenue.`;
+    default:
+      return `The added factor "${description}" has been incorporated into the analysis and modestly increases cost pressure.`;
   }
 }
+
+// Re-export type so components can import it without going to types.ts directly
+export type { AddedMarketFactor };

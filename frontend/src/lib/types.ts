@@ -1,4 +1,4 @@
-// ─── API Contracts ────────────────────────────────────────────────────────────
+// ─── API / Pipeline ───────────────────────────────────────────────────────────
 
 export interface DescriptionsPayload {
   descriptions: string[];
@@ -25,7 +25,7 @@ export interface JobStatus {
 // ─── Report ───────────────────────────────────────────────────────────────────
 
 export type DecisionLabel = "Launch" | "Adapt concept" | "Delay" | "Do not launch";
-export type RiskLevel = "Low" | "Medium" | "High";
+export type RiskLevel = "Low" | "Medium-low" | "Medium" | "Medium-high" | "High";
 export type DriverDirection = "positive" | "negative" | "mixed";
 
 export interface HistoricalPoint {
@@ -49,7 +49,6 @@ export interface Driver {
   name: string;
   importance: number;
   direction: DriverDirection;
-  /** Importance per horizon: e.g. { month_1: 0.85, month_6: 0.42 } */
   horizon?: Record<string, number>;
   explanation?: string;
 }
@@ -60,9 +59,7 @@ export interface InvestmentItem {
 }
 
 export interface Backtest {
-  /** Human-readable quality label, e.g. "medium-high" */
   quality: string;
-  /** Mean Absolute Percentage Error (0–100) */
   mape: number;
 }
 
@@ -94,12 +91,70 @@ export interface Report {
   backtest: Backtest;
 }
 
-// ─── What-if ──────────────────────────────────────────────────────────────────
+// ─── What-if overrides ────────────────────────────────────────────────────────
 
-export interface WhatIfOverrides {
-  monthly_rent?: number;
-  average_basket_price?: number;
-  gross_margin_pct?: number;
+export type OverrideType = "currency" | "percentage" | "number" | "select";
+
+export interface AllowedOverride {
+  id: string;
+  label: string;
+  type: OverrideType;
+  unit?: string;
+  base_value: number | string;
+  min?: number;
+  max?: number;
+  options?: string[];
+  description?: string;
+}
+
+export type OverrideValue = number | string;
+export type OverridesMap = Record<string, OverrideValue>;
+
+// ─── Comparison (shared by What-if and Add-factor) ───────────────────────────
+
+export interface ComparisonSummary {
+  decision: string;
+  break_even_probability: number;
+  expected_monthly_revenue: number;
+  expected_monthly_profit: number;
+  risk_level: string;
+}
+
+export interface ChangedAssumption {
+  label: string;
+  old: number | string;
+  new: number | string;
+  unit?: string;
+}
+
+export interface ComparisonResult {
+  baseline: ComparisonSummary;
+  adjusted: ComparisonSummary;
+  changed_assumptions?: ChangedAssumption[];
+  added_factor?: {
+    description: string;
+    keywords: string[];
+  };
+  impact_summary: string;
+}
+
+// ─── Add market factor ────────────────────────────────────────────────────────
+
+export interface AddedMarketFactor {
+  description: string;
+  keywords: string[];
+  status: "queued" | "running" | "added" | "failed";
+  reason_for_update?: string;
+}
+
+export interface AddMarketFactorResult {
+  status: "added";
+  factor: {
+    description: string;
+    keywords: string[];
+  };
+  comparison: ComparisonResult;
+  reason_for_update: string;
 }
 
 // ─── Navigation / UI helpers ─────────────────────────────────────────────────

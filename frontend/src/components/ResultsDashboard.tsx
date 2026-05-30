@@ -1,3 +1,4 @@
+import { useState, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { DecisionOverview } from "./DecisionOverview";
 import { FinancialProjection } from "./FinancialProjection";
@@ -6,31 +7,28 @@ import { DriverImportanceChart } from "./DriverImportanceChart";
 import { InvestmentBreakdown } from "./InvestmentBreakdown";
 import { ReasoningCard } from "./ReasoningCard";
 import { BacktestBadge } from "./BacktestBadge";
-import { WhatIfControl } from "./WhatIfControl";
-import type { Report, WhatIfOverrides } from "@/lib/types";
-import { recompute } from "@/lib/mockApi";
-import { useState, useCallback } from "react";
+import { WhatIfSensitivity } from "./WhatIfSensitivity";
+import { AddMarketFactor } from "./AddMarketFactor";
+import { BeforeAfterComparison } from "./BeforeAfterComparison";
+import type { Report, ComparisonResult } from "@/lib/types";
 
 interface ResultsDashboardProps {
   report: Report;
 }
 
-export function ResultsDashboard({ report: baseReport }: ResultsDashboardProps) {
-  const [report, setReport] = useState<Report>(baseReport);
+export function ResultsDashboard({ report }: ResultsDashboardProps) {
+  const [comparison, setComparison] = useState<ComparisonResult | null>(null);
 
-  const handleWhatIf = useCallback(
-    (overrides: WhatIfOverrides) => {
-      setReport(recompute(baseReport, overrides));
-    },
-    [baseReport],
-  );
+  const handleComparisonUpdate = useCallback((c: ComparisonResult | null) => {
+    setComparison(c);
+  }, []);
 
   return (
     <div className="space-y-6">
-      {/* 1. Verdict — hero of the screen */}
+      {/* 1. Decision verdict — hero */}
       <DecisionOverview decision={report.decision} />
 
-      {/* 2. Financial metrics */}
+      {/* 2. Financial projection */}
       <Section
         title="Financial projection"
         description="Estimated revenue, costs, and break-even outlook derived from the forecast."
@@ -38,7 +36,7 @@ export function ResultsDashboard({ report: baseReport }: ResultsDashboardProps) 
         <FinancialProjection financials={report.financials} />
       </Section>
 
-      {/* 3. Forecast chart — history + forecast + confidence band */}
+      {/* 3. Forecast chart */}
       <Section
         title="Demand forecast"
         description="Historical revenue signal and 6-month probabilistic forecast with confidence band."
@@ -54,7 +52,24 @@ export function ResultsDashboard({ report: baseReport }: ResultsDashboardProps) 
         </Card>
       </Section>
 
-      {/* 4. Drivers + Investment */}
+      {/* 4. What-if Sensitivity */}
+      <WhatIfSensitivity
+        baseReport={report}
+        onComparisonUpdate={handleComparisonUpdate}
+      />
+
+      {/* 5. Add another market factor */}
+      <AddMarketFactor
+        baseReport={report}
+        onComparisonUpdate={handleComparisonUpdate}
+      />
+
+      {/* 6. Before vs After (appears only after a change) */}
+      {comparison && (
+        <BeforeAfterComparison comparison={comparison} />
+      )}
+
+      {/* 7. Drivers + Investment */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card className="border-white/10 bg-card/60 backdrop-blur">
           <CardHeader>
@@ -95,7 +110,7 @@ export function ResultsDashboard({ report: baseReport }: ResultsDashboardProps) 
         </Card>
       </div>
 
-      {/* 5. Reasoning */}
+      {/* 8. Reasoning */}
       <Card className="border-white/10 bg-card/60 backdrop-blur">
         <CardHeader>
           <CardTitle className="text-base">Reasoning &amp; recommended moves</CardTitle>
@@ -107,9 +122,6 @@ export function ResultsDashboard({ report: baseReport }: ResultsDashboardProps) 
           <ReasoningCard reason={report.reason} />
         </CardContent>
       </Card>
-
-      {/* 6. What-if control */}
-      <WhatIfControl onChange={handleWhatIf} />
     </div>
   );
 }

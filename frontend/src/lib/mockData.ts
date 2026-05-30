@@ -1,4 +1,5 @@
 import type {
+  AllowedOverride,
   HistoricalPoint,
   ForecastBandPoint,
   Report,
@@ -47,10 +48,6 @@ export const exampleChips: string[] = [
 export const pitchPlaceholder =
   "Example: I want to open a premium ice cream shop in Vienna's 1st district focused on summer tourism and seasonal specials.";
 
-/**
- * Mock descriptions returned by /api/extract.
- * The backend extracts these from the free-text pitch.
- */
 export const mockDescriptions: string[] = [
   "Average monthly rent for small retail units in Vienna's 1st district",
   "Monthly consumer spending on ice cream and frozen desserts in Vienna",
@@ -59,19 +56,81 @@ export const mockDescriptions: string[] = [
   "Competition density for dessert and ice cream shops in Vienna's 1st district",
 ];
 
-// ─── What-if baseline (used by recompute) ────────────────────────────────────
+// ─── Economic constants (aligned with allowedOverrides base values) ───────────
 
-export const BASELINE = {
-  monthly_rent: 5800,
-  average_basket_price: 8.5,
-  gross_margin_pct: 65,
-  /** Derived: base_revenue / base_basket_price */
-  customers_per_month: Math.round(24000 / 8.5), // ≈ 2824
-  staff_costs: 8500,
-  other_overhead: 1700,
+export const ECONOMICS = {
+  base_revenue: 24000,             // EUR/month — from mockReport
+  base_basket_size: 42,            // EUR — from allowedOverrides
+  base_opening_days: 22,           // days/month — from allowedOverrides
+  staff_cost_per_employee: 2500,   // EUR/month per non-founder employee
+  fixed_overhead: 3500,            // EUR/month (rent + utilities + misc)
+  /** Derived: base_revenue / (base_basket × base_days) */
+  daily_customers: 24000 / (42 * 22), // ≈ 26.0
 };
 
-// ─── Historical series (28 months: Jan 2024 – Apr 2026) ──────────────────────
+// ─── Allowed overrides (rendered dynamically by WhatIfSensitivity) ─────────────
+
+export const allowedOverrides: AllowedOverride[] = [
+  {
+    id: "average_basket_size",
+    label: "Average basket size",
+    type: "currency",
+    unit: "EUR",
+    base_value: 42,
+    min: 20,
+    max: 120,
+    description: "Expected average customer spend per purchase.",
+  },
+  {
+    id: "gross_margin",
+    label: "Gross margin",
+    type: "percentage",
+    base_value: 0.35,
+    min: 0.15,
+    max: 0.70,
+    description: "Expected margin after product purchasing costs.",
+  },
+  {
+    id: "staffing_level",
+    label: "Staffing level",
+    type: "number",
+    unit: "employees",
+    base_value: 1,
+    min: 0,
+    max: 6,
+    description: "Number of planned employees besides the founder.",
+  },
+  {
+    id: "opening_days_per_month",
+    label: "Opening days per month",
+    type: "number",
+    unit: "days",
+    base_value: 22,
+    min: 10,
+    max: 30,
+    description: "Number of days the business operates per month.",
+  },
+  {
+    id: "initial_investment_budget",
+    label: "Initial investment budget",
+    type: "currency",
+    unit: "EUR",
+    base_value: 120000,
+    min: 20000,
+    max: 300000,
+    description: "Available budget for launch, setup, inventory, and initial runway.",
+  },
+  {
+    id: "product_price_level",
+    label: "Product price level",
+    type: "select",
+    base_value: "premium",
+    options: ["budget", "mid-market", "premium", "luxury"],
+    description: "Overall pricing position of the business concept.",
+  },
+];
+
+// ─── Historical series (Jan 2024 – Apr 2026, 28 months) ───────────────────────
 
 export const mockHistoricalSeries: HistoricalPoint[] = [
   { month: "Jan '24", value: 3200 },
@@ -104,8 +163,6 @@ export const mockHistoricalSeries: HistoricalPoint[] = [
   { month: "Apr '26", value: 17000 },
 ];
 
-// ─── Forecast (6 months: May 2026 – Oct 2026) ────────────────────────────────
-
 export const mockDemandForecast: ForecastBandPoint[] = [
   { month: "May '26", low: 19000, mid: 24800, high: 33000 },
   { month: "Jun '26", low: 24500, mid: 32000, high: 42000 },
@@ -128,11 +185,11 @@ export const mockReport: Report = {
   },
   financials: {
     expected_monthly_revenue: 24000,
-    expected_monthly_costs: 21500,
-    expected_monthly_profit: 2500,
+    expected_monthly_costs: 21600,
+    expected_monthly_profit: 2400,
     estimated_initial_investment: 95000,
     break_even_probability: 0.63,
-    payback_period_months: 38,
+    payback_period_months: 40,
   },
   graphs: {
     historical_series: mockHistoricalSeries,
