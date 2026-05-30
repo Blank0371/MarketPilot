@@ -14,7 +14,7 @@ const directionToVar: Record<Driver["direction"], string> = {
 
 export function DriverImportanceChart({ drivers }: DriverImportanceChartProps) {
   return (
-    <ul className="space-y-4">
+    <ul className="space-y-5">
       {drivers.map((d) => {
         const pct = Math.round(d.importance * 100);
         const horizonShift = getHorizonShift(d.horizon);
@@ -35,7 +35,7 @@ export function DriverImportanceChart({ drivers }: DriverImportanceChartProps) {
                 </span>
               </div>
             </div>
-            <div className="h-2 w-full overflow-hidden rounded-full bg-secondary">
+            <div className="h-2.5 w-full overflow-hidden rounded-full bg-secondary">
               <div
                 className="h-full rounded-full transition-all duration-700"
                 style={{ width: `${pct}%`, background: directionToVar[d.direction] }}

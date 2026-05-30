@@ -8,11 +8,11 @@ interface ReasoningCardProps {
 export function ReasoningCard({ reason }: ReasoningCardProps) {
   return (
     <div className="space-y-5">
-      <div className="rounded-xl border border-white/10 bg-background/40 p-4">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+      <div className="rounded-xl border border-white/10 bg-background/50 p-5">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
           Core reason
         </p>
-        <p className="mt-2 text-sm leading-relaxed text-foreground/90">{reason.main_reason}</p>
+        <p className="mt-2.5 text-sm leading-relaxed text-foreground/90">{reason.main_reason}</p>
       </div>
 
       <FactorList
@@ -51,14 +51,14 @@ function FactorList({
   if (!items.length) return null;
   return (
     <div>
-      <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+      <p className="mb-2.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
         {title}
       </p>
-      <ul className="space-y-1.5">
+      <ul className="space-y-2">
         {items.map((it) => (
           <li
             key={it}
-            className="flex items-start gap-2.5 rounded-lg border border-white/5 bg-background/30 px-3 py-2 text-sm text-foreground/90"
+            className="flex items-start gap-3 rounded-lg border border-white/8 bg-background/40 px-3.5 py-3 text-sm text-foreground/90"
           >
             <span
               className="mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full"

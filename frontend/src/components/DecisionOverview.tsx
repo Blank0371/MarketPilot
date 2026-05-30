@@ -108,7 +108,7 @@ function StatTile({
   accent: string;
 }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-background/40 p-3.5 backdrop-blur">
+    <div className="rounded-xl border border-white/10 bg-background/40 p-4 backdrop-blur">
       <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
         {label}
       </p>
