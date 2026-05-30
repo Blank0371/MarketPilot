@@ -1,0 +1,49 @@
+{
+  "version": "1.1",
+  "data": {
+    "signals": [
+      {
+        "name": "Vienna tourism footfall",
+        "importance": 0.82,
+        "direction": "positive",
+        "correlation": 0.71,
+        "horizon": 1
+      },
+      {
+        "name": "Summer temperature / heatwaves",
+        "importance": 0.68,
+        "direction": "positive",
+        "correlation": 0.78,
+        "horizon": 1
+      },
+      {
+        "name": "Winter seasonality",
+        "importance": 0.63,
+        "direction": "negative",
+        "correlation": -0.74,
+        "horizon": 6
+      },
+      {
+        "name": "Consumer spending",
+        "importance": 0.55,
+        "direction": "positive",
+        "correlation": 0.41,
+        "horizon": 3
+      },
+      {
+        "name": "Local foot traffic",
+        "importance": 0.52,
+        "direction": "positive",
+        "correlation": 0.39,
+        "horizon": 2
+      },
+      {
+        "name": "Commercial rent pressure",
+        "importance": 0.47,
+        "direction": "negative",
+        "correlation": -0.33,
+        "horizon": 6
+      }
+    ]
+  }
+}

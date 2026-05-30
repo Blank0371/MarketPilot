@@ -1,0 +1,8 @@
+{
+  "version": "1.1",
+  "data": {
+    "mape": 0.1,
+    "rmse": 14.7,
+    "quality": "medium-high"
+  }
+}

@@ -3,3 +3,6 @@ uvicorn[standard]>=0.34
 pydantic>=2.8
 httpx>=0.27
 pytest>=7.4
+numpy>=1.26
+sybilion>=0.1.4
+openai>=1.69
