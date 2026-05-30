@@ -37,7 +37,7 @@ export function PitchStep({ placeholder, examples, loading, onSubmit }: PitchSte
           disabled={loading}
         />
         <div className="space-y-2">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
             Try an example
           </p>
           <div className="flex flex-wrap gap-2">

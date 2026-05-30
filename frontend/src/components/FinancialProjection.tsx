@@ -61,7 +61,7 @@ export function FinancialProjection({ financials }: FinancialProjectionProps) {
       {cells.map((c) => (
         <div
           key={c.label}
-          className="group relative overflow-hidden rounded-xl border border-white/10 bg-card/60 p-4 backdrop-blur transition-colors hover:border-white/20"
+          className="group relative overflow-hidden rounded-xl border border-white/10 bg-card/60 p-5 backdrop-blur transition-colors hover:border-white/20"
           style={{
             borderTop: `2px solid ${toneColor[c.tone ?? "neutral"]}`,
             boxShadow: `inset 0 2px 12px -6px ${toneColor[c.tone ?? "neutral"]}40`,
@@ -71,7 +71,7 @@ export function FinancialProjection({ financials }: FinancialProjectionProps) {
             {c.label}
           </p>
           <p
-            className="mt-2 text-xl font-semibold tabular-nums transition-all"
+            className="mt-2 text-2xl font-semibold tabular-nums transition-all"
             style={{ color: toneColor[c.tone ?? "neutral"] }}
           >
             {c.value}

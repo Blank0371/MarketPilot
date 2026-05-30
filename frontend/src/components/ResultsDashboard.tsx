@@ -71,7 +71,7 @@ export function ResultsDashboard({ report }: ResultsDashboardProps) {
 
       {/* 7. Drivers + Investment */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card className="border-white/10 bg-card/60 backdrop-blur">
+        <Card className="border-white/10 bg-card/60 shadow-[0_0_40px_-24px_var(--primary)] backdrop-blur">
           <CardHeader>
             <CardTitle className="text-base">Driver importance</CardTitle>
             <CardDescription>
@@ -97,7 +97,7 @@ export function ResultsDashboard({ report }: ResultsDashboardProps) {
           </CardContent>
         </Card>
 
-        <Card className="border-white/10 bg-card/60 backdrop-blur">
+        <Card className="border-white/10 bg-card/60 shadow-[0_0_40px_-24px_var(--accent)] backdrop-blur">
           <CardHeader>
             <CardTitle className="text-base">Investment breakdown</CardTitle>
             <CardDescription>
@@ -111,7 +111,7 @@ export function ResultsDashboard({ report }: ResultsDashboardProps) {
       </div>
 
       {/* 8. Reasoning */}
-      <Card className="border-white/10 bg-card/60 backdrop-blur">
+      <Card className="border-white/10 bg-card/60 shadow-[0_0_40px_-24px_var(--primary)] backdrop-blur">
         <CardHeader>
           <CardTitle className="text-base">Reasoning &amp; recommended moves</CardTitle>
           <CardDescription>
@@ -138,12 +138,12 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="space-y-3">
+    <section className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
+        <div className="pl-3 border-l-2 border-primary/35">
           <h3 className="text-base font-semibold text-foreground/90">{title}</h3>
           {description && (
-            <p className="text-xs text-muted-foreground">{description}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
           )}
         </div>
         {badge}

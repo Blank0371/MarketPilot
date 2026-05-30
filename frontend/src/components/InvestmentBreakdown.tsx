@@ -33,7 +33,7 @@ export function InvestmentBreakdown({ items }: InvestmentBreakdownProps) {
         <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
           Total estimated investment
         </p>
-        <p className="text-xl font-semibold tabular-nums text-foreground">
+        <p className="text-2xl font-semibold tabular-nums text-foreground">
           {fmtEUR(total)}
         </p>
       </div>
@@ -58,7 +58,7 @@ export function InvestmentBreakdown({ items }: InvestmentBreakdownProps) {
           return (
             <li
               key={s.category}
-              className="flex items-center justify-between gap-3 rounded-lg border border-white/5 bg-background/30 px-3 py-2"
+              className="flex items-center justify-between gap-3 rounded-lg border border-white/8 bg-background/40 px-3.5 py-3"
             >
               <div className="flex items-center gap-2.5 min-w-0">
                 <span
