@@ -70,9 +70,9 @@ SYBILION_BASE_URL    = os.getenv("SYBILION_BASE_URL", "https://api.sybilion.dev"
 
 _LLM_TIMEOUT_S           = 30.0
 _DATA_ENGINEER_TIMEOUT_S = 30.0
-_SYBILION_SUBMIT_TIMEOUT = 30.0
-_SYBILION_POLL_INTERVAL  = 8.0
-_SYBILION_MAX_POLLS      = 30
+_SYBILION_SUBMIT_TIMEOUT = 360.0
+_SYBILION_POLL_INTERVAL  = 20.0
+_SYBILION_MAX_POLLS      = 50
 
 SESSION_TTL_SECONDS = int(os.getenv("SESSION_TTL_SECONDS", "7200"))
 
@@ -349,6 +349,94 @@ class SybilionClient:
         except Exception as exc:
             logger.warning("Could not download Sybilion artifact %s: %s", href, exc)
             return {}
+
+    def submit_job(self, client: httpx.Client, payload: dict[str, Any]) -> str:
+        """Submit one forecast job and return its job_id."""
+        r = client.post(
+            f"{self.base_url}/api/v1/forecasts",
+            headers=self._headers(),
+            json=payload,
+        )
+        r.raise_for_status()
+        job_id = r.json()["job_id"]
+        logger.info("Sybilion job submitted: %s", job_id)
+        return job_id
+
+    def poll_job(self, client: httpx.Client, job_id: str) -> tuple[dict, dict] | None:
+        """Poll one job. Returns (forecast, signals) if done, None if still running.
+        Raises RuntimeError on failure."""
+        status_r = client.get(
+            f"{self.base_url}/api/v1/forecasts/{job_id}",
+            headers=self._headers(),
+        )
+        status_r.raise_for_status()
+        status_data = status_r.json()
+        status      = status_data.get("status", "")
+
+        if status_data.get("settled") or status == "completed":
+            artifacts = {a["name"]: a["href"] for a in status_data.get("artifacts", [])}
+            forecast  = self._download_artifact(client, artifacts.get("forecast.json", ""))
+            signals   = self._download_artifact(client, artifacts.get("external_signals.json", ""))
+            return forecast, signals
+
+        if status in ("failed", "canceled", "error"):
+            raise RuntimeError(f"Sybilion job {job_id} ended with status: {status}")
+
+        return None  # still running
+
+    def run_forecast_batch(
+        self,
+        payloads: list[dict[str, Any]],
+    ) -> list[tuple[dict, dict]]:
+        """Submit all payloads, then poll until every job is complete.
+
+        Returns a list of (forecast, signals) in the same order as payloads.
+        Individual job failures fall back to mock rather than aborting the batch.
+        """
+        if not payloads:
+            return []
+
+        with httpx.Client(timeout=_SYBILION_SUBMIT_TIMEOUT) as client:
+            # Submit all jobs first
+            job_ids: list[str | None] = []
+            for i, payload in enumerate(payloads):
+                try:
+                    job_ids.append(self.submit_job(client, payload))
+                except Exception as exc:
+                    logger.warning("Sybilion submit failed for payload %d (%s); will use mock", i, exc)
+                    job_ids.append(None)
+
+            # Poll until all settled
+            results: list[tuple[dict, dict] | None] = [None] * len(job_ids)
+            pending = {i: jid for i, jid in enumerate(job_ids) if jid is not None}
+
+            for attempt in range(_SYBILION_MAX_POLLS):
+                if not pending:
+                    break
+                time.sleep(_SYBILION_POLL_INTERVAL)
+                done_indices = []
+                for i, job_id in list(pending.items()):
+                    try:
+                        result = self.poll_job(client, job_id)
+                        if result is not None:
+                            results[i] = result
+                            done_indices.append(i)
+                            logger.info("Sybilion job %s complete (%d/%d done)",
+                                        job_id, len(results) - results.count(None), len(results))
+                    except Exception as exc:
+                        logger.warning("Sybilion job %s failed (%s); using mock", job_id, exc)
+                        results[i] = _mock_sybilion_forecast()
+                        done_indices.append(i)
+                for i in done_indices:
+                    pending.pop(i)
+
+            # Any still-pending after max polls → mock
+            for i in pending:
+                logger.warning("Sybilion job %s timed out; using mock", job_ids[i])
+                results[i] = _mock_sybilion_forecast()
+
+        # Any that failed to submit → mock
+        return [r if r is not None else _mock_sybilion_forecast() for r in results]
 
 
 def _mock_sybilion_forecast() -> tuple[dict, dict]:
@@ -654,28 +742,47 @@ def _b_user(descriptions: list[str]) -> str:
     )
 
 
-def _c_user(session: _Session, new_descriptions: list[str], forecast: dict, signals: dict) -> str:
-    all_desc    = session.all_descriptions()
-    ts          = session.merged_timeseries()
-    keywords    = session.all_keywords()
-    round_n     = len(session.rounds)
-    fc_series   = forecast.get("data", {}).get("forecast_series", forecast.get("forecast_series", {}))
-    fc_summary  = json.dumps(dict(list(sorted(fc_series.items()))[:12]), indent=2) if fc_series else "{}"
-    drivers     = signals.get("drivers", signals.get("external_signals", []))[:6]
-    drivers_txt = json.dumps(drivers, indent=2) if drivers else "[]"
-    ts_recent   = dict(list(sorted(ts.items()))[-12:])
-    new_block   = "\n".join(f"  - {d}" for d in new_descriptions)
-    all_block   = "\n".join(f"  {i}. {d}" for i, d in enumerate(all_desc, 1))
+def _c_user(
+    session:             _Session,
+    new_descriptions:    list[str],
+    description_results: list[dict[str, Any]],
+) -> str:
+    all_desc = session.all_descriptions()
+    ts       = session.merged_timeseries()
+    keywords = session.all_keywords()
+    round_n  = len(session.rounds)
+
+    ts_recent = dict(list(sorted(ts.items()))[-12:])
+    new_block = "\n".join(f"  - {d}" for d in new_descriptions)
+    all_block = "\n".join(f"  {i}. {d}" for i, d in enumerate(all_desc, 1))
+
+    # Build a per-description forecast block so the LLM sees each result paired
+    # with the description it belongs to.
+    per_desc_blocks = []
+    for r in description_results:
+        fc_series = r["forecast"].get("data", {}).get(
+            "forecast_series", r["forecast"].get("forecast_series", {})
+        )
+        fc_pts = {dt: (v["forecast"] if isinstance(v, dict) else v)
+                  for dt, v in list(sorted(fc_series.items()))[:6]}
+        sig     = r["signals"]
+        drivers = sig.get("drivers", sig.get("external_signals", []))[:3]
+        per_desc_blocks.append(
+            f"  Description: {r['description']}\n"
+            f"  Forecast:    {json.dumps(fc_pts)}\n"
+            f"  Top drivers: {json.dumps(drivers)}"
+        )
+    per_desc_txt = "\n\n".join(per_desc_blocks) if per_desc_blocks else "(none)"
 
     return (
         f"=== Round {round_n} ===\n\n"
         f"NEW descriptions added this round:\n{new_block}\n\n"
         f"ALL accumulated descriptions ({len(all_desc)} total):\n{all_block}\n\n"
         f"Keywords: {', '.join(keywords)}\n\n"
-        f"Historical timeseries - last 12 observations:\n{json.dumps(ts_recent, indent=2)}\n"
+        f"Historical timeseries — last 12 observations:\n{json.dumps(ts_recent, indent=2)}\n"
         f"Total historical observations: {len(ts)}\n\n"
-        f"Sybilion demand forecast:\n{fc_summary}\n\n"
-        f"Top economic drivers (from Sybilion external_signals):\n{drivers_txt}\n\n"
+        f"Per-description Sybilion forecasts (each description matched to its own result):\n"
+        f"{per_desc_txt}\n\n"
         "Based on ALL of the above (including every prior judgment in this conversation), "
         "produce an updated business judgment. Return ONLY this JSON:\n"
         "{\n"
@@ -860,22 +967,28 @@ def _run_pipeline(
     logger.info("STEP 4 | session now has %d round(s), %d total observations",
                 len(session.rounds), len(session.merged_timeseries()))
 
-    logger.info("STEP 5 | submitting to Sybilion | timeseries: %d obs | keywords: %s",
-                len(session.merged_timeseries()), session.all_keywords())
+    logger.info("STEP 5 | submitting %d Sybilion jobs | timeseries: %d obs | keywords: %s",
+                len(new_descriptions), len(session.merged_timeseries()), session.all_keywords())
 
-    # Step 5 — Sybilion
-    sybilion_payload  = session.sybilion_payload()
-    forecast, signals = _run_sybilion(sybilion_client, sybilion_payload)
-    fc_series = forecast.get("data", {}).get("forecast_series", forecast.get("forecast_series", {}))
-    drivers   = signals.get("drivers", signals.get("external_signals", []))
-    logger.info("STEP 5 | forecast points: %d | drivers: %d | mock: %s",
-                len(fc_series), len(drivers), forecast.get("_mock", False))
+    # Step 5 — one Sybilion job per description
+    description_results = _run_sybilion_batch(
+        sybilion_client, session, new_descriptions, keywords, title
+    )
+    total_fc_points = sum(
+        len(r["forecast"].get("data", {}).get("forecast_series",
+            r["forecast"].get("forecast_series", {})))
+        for r in description_results
+    )
+    logger.info("STEP 5 | %d jobs complete | total forecast points: %d",
+                len(description_results), total_fc_points)
 
     logger.info("STEP 6 | running LLM judgment | conversation turns so far: %d",
                 max(0, (len(session.messages) - 1) // 2))
 
-    # Step 6 — LLM judgment
-    judgment = _run_judgment(session, new_descriptions, forecast, signals, client=llm_client)
+    # Step 6 — LLM judgment receives all per-description forecasts
+    judgment = _run_judgment(
+        session, new_descriptions, description_results, client=llm_client
+    )
     logger.info("STEP 6 | verdict=%r  score=%s  fallback=%s",
                 judgment.get("verdict"), judgment.get("score"), judgment.get("_fallback", False))
 
@@ -883,6 +996,31 @@ def _run_pipeline(
                 session.session_id, len(session.rounds))
 
     # Step 7 — response
+    # Aggregate forecast_series and drivers across all description results for the dashboard
+    agg_fc_series: dict[str, float] = {}
+    all_drivers:   list[dict]       = []
+    for r in description_results:
+        fc_series = r["forecast"].get("data", {}).get(
+            "forecast_series", r["forecast"].get("forecast_series", {})
+        )
+        for dt, v in fc_series.items():
+            val = v["forecast"] if isinstance(v, dict) else v
+            # Average across descriptions for the same date
+            if dt in agg_fc_series:
+                agg_fc_series[dt] = (agg_fc_series[dt] + val) / 2
+            else:
+                agg_fc_series[dt] = val
+        sig = r["signals"]
+        all_drivers.extend(sig.get("drivers", sig.get("external_signals", [])))
+
+    # Dedupe drivers by name, keeping highest importance
+    seen_drivers: dict[str, dict] = {}
+    for d in all_drivers:
+        name = d.get("name", "")
+        if name not in seen_drivers or d.get("importance", 0) > seen_drivers[name].get("importance", 0):
+            seen_drivers[name] = d
+    top_drivers = sorted(seen_drivers.values(), key=lambda d: d.get("importance", 0), reverse=True)[:5]
+
     return {
         "session_id":         session.session_id,
         "round":              len(session.rounds),
@@ -892,41 +1030,87 @@ def _run_pipeline(
             "statistic_title":  title,
             "keywords":         keywords,
             "observations":     len(session.merged_timeseries()),
-            "forecast_horizon": sybilion_payload.get("soft_horizon"),
-            "forecast_series": {
-                dt: v["forecast"] if isinstance(v, dict) else v
-                for dt, v in fc_series.items()
-            },
-            "top_drivers": drivers[:5],
+            "forecast_horizon": 6,
+            "forecast_series":  dict(sorted(agg_fc_series.items())),
+            "top_drivers":      top_drivers,
+            "per_description":  [
+                {
+                    "description": r["description"],
+                    "forecast_series": {
+                        dt: v["forecast"] if isinstance(v, dict) else v
+                        for dt, v in r["forecast"].get("data", {}).get(
+                            "forecast_series", r["forecast"].get("forecast_series", {})
+                        ).items()
+                    },
+                }
+                for r in description_results
+            ],
         },
     }
 
 
-def _run_sybilion(client: SybilionClient, payload: dict[str, Any]) -> tuple[dict, dict]:
+def _run_sybilion_batch(
+    client:       SybilionClient,
+    session:      "_Session",
+    descriptions: list[str],
+    keywords:     list[str],
+    title:        str,
+) -> list[dict[str, Any]]:
+    """Run one Sybilion forecast job per description.
+
+    Each description gets its own payload (using the full merged timeseries as
+    the series context, but with a per-description metadata title).
+    Returns a list of result dicts, one per description, each containing:
+      { "description", "forecast", "signals" }
+    """
+    base_ts = session.merged_timeseries()
+
     if not client.available:
-        logger.info("SYBILION_API_KEY not set; using mock forecast")
-        return _mock_sybilion_forecast()
-    try:
-        return client.run_forecast(payload)
-    except Exception as exc:
-        logger.warning("Sybilion failed (%s); using mock forecast", exc)
-        return _mock_sybilion_forecast()
+        logger.info("SYBILION_API_KEY not set; using mock forecasts for all descriptions")
+        results = []
+        for desc in descriptions:
+            fc, sig = _mock_sybilion_forecast()
+            results.append({"description": desc, "forecast": fc, "signals": sig})
+        return results
+
+    # Build one payload per description
+    payloads = []
+    for desc in descriptions:
+        payloads.append({
+            "pipeline_version": "v1",
+            "frequency":        "monthly",
+            "recency_factor":   0.6,
+            "soft_horizon":     6,
+            "timeseries_metadata": {
+                "title":       desc,
+                "description": desc,
+                "keywords":    keywords,
+            },
+            "timeseries": base_ts,
+        })
+
+    logger.info("Submitting %d Sybilion jobs for %d descriptions", len(payloads), len(descriptions))
+    batch_results = client.run_forecast_batch(payloads)
+
+    return [
+        {"description": desc, "forecast": fc, "signals": sig}
+        for desc, (fc, sig) in zip(descriptions, batch_results)
+    ]
 
 
 def _run_judgment(
-    session:          _Session,
-    new_descriptions: list[str],
-    forecast:         dict,
-    signals:          dict,
+    session:             _Session,
+    new_descriptions:    list[str],
+    description_results: list[dict[str, Any]],
     *,
-    client:           FeatherlessClient | None = None,
+    client:              FeatherlessClient | None = None,
 ) -> dict[str, Any]:
     client = client or FeatherlessClient()
 
     if not session.messages:
         session.messages.append({"role": "system", "content": _C_SYSTEM})
 
-    user_msg = _c_user(session, new_descriptions, forecast, signals)
+    user_msg = _c_user(session, new_descriptions, description_results)
     session.messages.append({"role": "user", "content": user_msg})
 
     if client.available:
