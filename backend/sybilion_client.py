@@ -64,13 +64,23 @@ _SIGMA_BOUNDS = (0.10, 0.25)
 # ---------------------------------------------------------------------------
 # Request building (Block 4 transforms the Data-Engineer response, §4.3 / §5.5)
 # ---------------------------------------------------------------------------
-def build_forecast_request(timeseries: dict[str, float], metadata: dict[str, Any]) -> dict[str, Any]:
-    """Build the Sybilion forecast request body from the Data-Engineer response."""
+def build_forecast_request(
+    timeseries: dict[str, float],
+    metadata: dict[str, Any],
+    *,
+    soft_horizon: int = FORECAST_HORIZON,
+) -> dict[str, Any]:
+    """Build the Sybilion forecast request body from the Data-Engineer response.
+
+    ``soft_horizon`` is the forecast-horizon contract (MODEL.md §2.2): it arrives
+    with the request rather than being hard-coded, so forecast depth can change
+    without touching the model.
+    """
     meta = metadata or {}
     return {
         "pipeline_version": PIPELINE_VERSION,
         "frequency": FREQUENCY,
-        "soft_horizon": FORECAST_HORIZON,
+        "soft_horizon": soft_horizon,
         "recency_factor": RECENCY_FACTOR,
         "backtest": True,
         "timeseries_metadata": {
@@ -124,13 +134,18 @@ def _yoy_sigma(points: list[tuple[date, float]]) -> float:
 # ---------------------------------------------------------------------------
 # Mock / cache generation
 # ---------------------------------------------------------------------------
-def generate_mock_artifacts(timeseries: dict[str, float]) -> dict[str, dict]:
+def generate_mock_artifacts(
+    timeseries: dict[str, float],
+    *,
+    horizon: int = FORECAST_HORIZON,
+) -> dict[str, dict]:
     """Deterministically derive Sybilion-shaped artifacts from the history.
 
     The forecast is a seasonal-naive projection with year-over-year drift and a
     p10/p90 band from the historical YoY volatility. Drivers and backtest are
     derived from the same series so the cache reads like a real response. This is
-    the fallback used whenever the live API is unavailable.
+    the fallback used whenever the live API is unavailable. ``horizon`` is the
+    requested forecast depth (MODEL.md §2.2); we emit exactly that many points.
     """
     points = _sorted_series(timeseries)
     if not points:
@@ -144,7 +159,7 @@ def generate_mock_artifacts(timeseries: dict[str, float]) -> dict[str, dict]:
 
     last_date = points[-1][0]
     forecast_series: dict[str, dict] = {}
-    for step in range(1, FORECAST_HORIZON + 1):
+    for step in range(1, horizon + 1):
         d = _add_months(last_date, step)
         source = by_date.get(_add_months(d, -12), seasonal_avg)
         point = round(source * growth, 2)
@@ -158,9 +173,9 @@ def generate_mock_artifacts(timeseries: dict[str, float]) -> dict[str, dict]:
     forecast = {
         "version": "1.1",
         "data": {
-            "forecast_horizon": FORECAST_HORIZON,
+            "forecast_horizon": horizon,
             "forecast_start": _add_months(last_date, 1).isoformat(),
-            "forecast_end": _add_months(last_date, FORECAST_HORIZON).isoformat(),
+            "forecast_end": _add_months(last_date, horizon).isoformat(),
             "forecast_series": forecast_series,
         },
     }
@@ -316,8 +331,13 @@ def _read_json(path: Path) -> dict | None:
         return None
 
 
-def _load_from_cache(timeseries: dict[str, float]) -> dict:
-    """Load cached artifacts; regenerate from the series if any file is missing."""
+def _load_from_cache(timeseries: dict[str, float], *, horizon: int = FORECAST_HORIZON) -> dict:
+    """Load cached artifacts; regenerate from the series if any file is missing.
+
+    If the cached forecast cannot satisfy the requested ``horizon`` (it has fewer
+    points), we regenerate a mock at that horizon and flag the result ``"mock"``
+    so the report can surface the fallback (MODEL.md §1.1).
+    """
     forecast_raw = _read_json(FORECAST_CACHE)
     signals_raw = _read_json(SIGNALS_CACHE)
     backtest_raw = _read_json(BACKTEST_CACHE)
@@ -325,15 +345,23 @@ def _load_from_cache(timeseries: dict[str, float]) -> dict:
     source = "cache"
     if forecast_raw is None or signals_raw is None or backtest_raw is None:
         logger.info("cache incomplete; generating mock artifacts in memory")
-        generated = generate_mock_artifacts(timeseries)
+        generated = generate_mock_artifacts(timeseries, horizon=horizon)
         forecast_raw = forecast_raw or generated["forecast"]
         signals_raw = signals_raw or generated["signals"]
         backtest_raw = backtest_raw or generated["backtest"]
         source = "mock"
 
+    forecast = parse_forecast_artifact(forecast_raw)
+    if len(forecast) < horizon:
+        # Cache is shorter than the requested horizon — regenerate at the horizon.
+        logger.info("cache has %d points < horizon %d; regenerating mock", len(forecast), horizon)
+        forecast = parse_forecast_artifact(generate_mock_artifacts(timeseries, horizon=horizon)["forecast"])
+        source = "mock"
+    forecast = forecast[:horizon]  # honor the horizon contract (MODEL.md §2.2)
+
     return {
         "source": source,
-        "forecast": parse_forecast_artifact(forecast_raw),
+        "forecast": forecast,
         "drivers": parse_signals_artifact(signals_raw),
         "backtest": parse_backtest_artifact(backtest_raw),
     }
@@ -347,7 +375,13 @@ _SIGNALS_ARTIFACT = "external_signals.json"
 _BACKTEST_ARTIFACT = "backtest_metrics.json"
 
 
-def _run_live_forecast(timeseries: dict[str, float], metadata: dict[str, Any], *, timeout_s: float) -> dict:
+def _run_live_forecast(
+    timeseries: dict[str, float],
+    metadata: dict[str, Any],
+    *,
+    timeout_s: float,
+    soft_horizon: int = FORECAST_HORIZON,
+) -> dict:
     """Submit -> poll -> fetch artifacts via the Sybilion SDK, then cache them.
 
     Raises on any failure so the caller can fall back to the cache.
@@ -355,7 +389,7 @@ def _run_live_forecast(timeseries: dict[str, float], metadata: dict[str, Any], *
     from sybilion import Client  # imported lazily so the module loads without the SDK
     from sybilion._api.models.forecast_request_v1 import ForecastRequestV1
 
-    request_body = build_forecast_request(timeseries, metadata)
+    request_body = build_forecast_request(timeseries, metadata, soft_horizon=soft_horizon)
     client = Client(token=os.environ.get("SYBILION_API_TOKEN"))
 
     submitted = client.submit_forecast(ForecastRequestV1.from_dict(request_body))
@@ -402,6 +436,7 @@ def get_forecast(
     *,
     use_live: bool | None = None,
     timeout_s: float = 240.0,
+    forecast_horizon_months: int = FORECAST_HORIZON,
 ) -> dict:
     """Return a normalized forecast for the series, with a built-in fallback.
 
@@ -409,20 +444,27 @@ def get_forecast(
     iff ``SYBILION_API_TOKEN`` is set). Any failure — missing key, timeout, bad
     response — falls back to the cached/mock artifacts so the demo never blocks.
 
+    ``forecast_horizon_months`` is the horizon contract (MODEL.md §2.2): it is
+    clamped to [1, 12], passed to Sybilion as ``soft_horizon``, and bounds how
+    many forecast points the result carries.
+
     Returns ``{source, forecast, drivers, backtest}`` where ``source`` is
     ``"live"``, ``"cache"`` or ``"mock"``.
     """
     metadata = metadata or {}
+    horizon = max(1, min(12, int(forecast_horizon_months)))  # clamp 1..12 — see MODEL.md §2.2
     if use_live is None:
         use_live = bool(os.environ.get("SYBILION_API_TOKEN"))
 
     if use_live:
         try:
-            return _run_live_forecast(timeseries, metadata, timeout_s=timeout_s)
+            result = _run_live_forecast(timeseries, metadata, timeout_s=timeout_s, soft_horizon=horizon)
+            result["forecast"] = result["forecast"][:horizon]
+            return result
         except Exception as exc:  # noqa: BLE001 — any failure must degrade gracefully
             logger.warning("live Sybilion forecast failed (%s); falling back to cache", exc)
 
-    return _load_from_cache(timeseries)
+    return _load_from_cache(timeseries, horizon=horizon)
 
 
 if __name__ == "__main__":  # pragma: no cover - manual cache seeding
