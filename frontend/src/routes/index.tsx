@@ -17,6 +17,8 @@ import {
   trustFeatures,
 } from "@/lib/mockData";
 import { extract, confirm, getStatus, getResult } from "@/lib/mockApi";
+import { extractDescriptionsFromEndpoint } from "@/lib/api";
+import type { DataMode } from "@/lib/api";
 import type { Report, PipelineStep } from "@/lib/types";
 
 export const Route = createFileRoute("/")({
@@ -49,6 +51,9 @@ function Index() {
   const [jobId, setJobId] = useState<string | null>(null);
   const [pipelineStep, setPipelineStep] = useState<PipelineStep>("extracting");
   const [report, setReport] = useState<Report | null>(null);
+  // Temporary dev control for switching between mock data and backend endpoint.
+  const [dataMode, setDataMode] = useState<DataMode>("mock");
+  const [extractError, setExtractError] = useState<string | null>(null);
 
   const workflowRef = useRef<HTMLDivElement>(null);
 
@@ -59,11 +64,26 @@ function Index() {
   // ─── Step 1: extract descriptions from pitch ─────────────────────────────
   const handleExtract = async (pitchText: string) => {
     setExtracting(true);
+    setExtractError(null);
     scrollToWorkflow();
     try {
-      const payload = await extract(pitchText);
-      setDescriptions(payload.descriptions);
-      setPhase("confirm");
+      if (dataMode === "mock") {
+        const payload = await extract(pitchText);
+        setDescriptions(payload.descriptions);
+        setPhase("confirm");
+      } else {
+        try {
+          const payload = await extractDescriptionsFromEndpoint(pitchText);
+          setDescriptions(payload.descriptions);
+          setPhase("confirm");
+        } catch (err) {
+          setExtractError(
+            err instanceof Error
+              ? err.message
+              : "Backend extraction failed. Check that the backend is running on http://127.0.0.1:8003.",
+          );
+        }
+      }
     } finally {
       setExtracting(false);
     }
@@ -163,12 +183,45 @@ function Index() {
 
           <div id="demo" className="scroll-mt-20">
             {phase === "idea" && (
-              <PitchStep
-                placeholder={pitchPlaceholder}
-                examples={exampleChips}
-                loading={extracting}
-                onSubmit={handleExtract}
-              />
+              <div className="space-y-3">
+                {/* ── Temporary dev control for switching between mock data and backend endpoint. ── */}
+                <div className="flex items-center justify-end gap-2.5">
+                  <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/50">
+                    Data mode
+                  </span>
+                  <div className="flex rounded-lg border border-white/10 bg-background/40 p-0.5 gap-0.5">
+                    {(["mock", "endpoint"] as const).map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => { setDataMode(m); setExtractError(null); }}
+                        className={
+                          dataMode === m
+                            ? "rounded-md px-3 py-1 text-[11px] font-semibold capitalize bg-primary/15 text-primary border border-primary/25 transition-all"
+                            : "rounded-md px-3 py-1 text-[11px] capitalize text-muted-foreground/70 transition-colors hover:bg-white/5 hover:text-foreground"
+                        }
+                      >
+                        {m}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {/* ── End dev control ── */}
+
+                {extractError && (
+                  <div className="flex items-start gap-2.5 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                    <span className="mt-0.5 shrink-0">⚠</span>
+                    <span>{extractError}</span>
+                  </div>
+                )}
+
+                <PitchStep
+                  placeholder={pitchPlaceholder}
+                  examples={exampleChips}
+                  loading={extracting}
+                  onSubmit={handleExtract}
+                />
+              </div>
             )}
 
             {phase === "confirm" && (
