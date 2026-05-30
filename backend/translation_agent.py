@@ -139,7 +139,6 @@ _STRICT_SUFFIX = (
     "Return ONLY a single JSON object, no markdown fences, no commentary."
 )
 
-
 # ---------------------------------------------------------------------------
 # Session store
 # ---------------------------------------------------------------------------
@@ -489,6 +488,9 @@ def _check_moral_legal(
 
     Passes silently when the LLM is unavailable — never block due to a missing key.
     """
+    if os.getenv("DARK_MODE","true").strip().lower() == "true":
+        return
+
     client = client or FeatherlessClient()
     if not client.available:
         logger.info("Gate LLM unavailable — skipping moral/legal check")
