@@ -1,7 +1,7 @@
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap");
 
 @custom-variant dark (&:is(.dark *));
 
@@ -72,7 +72,8 @@
   --color-decision-danger: var(--decision-danger);
   --color-decision-danger-foreground: var(--decision-danger-foreground);
   --color-decision-danger-soft: var(--decision-danger-soft);
-  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Space Grotesk", "DM Sans", ui-sans-serif, system-ui, sans-serif;
 }
 
 :root {
@@ -178,4 +179,30 @@
       radial-gradient(900px 500px at 95% 5%, oklch(0.62 0.22 290 / 10%), transparent 65%);
     background-attachment: fixed;
   }
+
+  h1, h2, h3 {
+    font-family: var(--font-display);
+  }
+}
+
+/* Range input (slider) custom thumb */
+.slider-thumb::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  height: 14px;
+  width: 14px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  cursor: pointer;
+  box-shadow: 0 0 8px -2px var(--color-primary);
+  border: 2px solid var(--color-background);
+  margin-top: -4px;
+}
+.slider-thumb::-moz-range-thumb {
+  height: 14px;
+  width: 14px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  cursor: pointer;
+  box-shadow: 0 0 8px -2px var(--color-primary);
+  border: 2px solid var(--color-background);
 }

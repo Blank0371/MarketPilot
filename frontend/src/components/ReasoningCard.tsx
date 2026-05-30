@@ -1,37 +1,35 @@
 import { Check, X, Lightbulb } from "lucide-react";
-import type { ResultReasoning } from "@/lib/types";
+import type { Report } from "@/lib/types";
 
 interface ReasoningCardProps {
-  reasoning: ResultReasoning;
+  reason: Report["reason"];
 }
 
-export function ReasoningCard({ reasoning }: ReasoningCardProps) {
+export function ReasoningCard({ reason }: ReasoningCardProps) {
   return (
     <div className="space-y-5">
       <div className="rounded-xl border border-white/10 bg-background/40 p-4">
         <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Main reason
+          Core reason
         </p>
-        <p className="mt-2 text-sm leading-relaxed text-foreground/90">
-          {reasoning.main_reason}
-        </p>
+        <p className="mt-2 text-sm leading-relaxed text-foreground/90">{reason.main_reason}</p>
       </div>
 
       <FactorList
-        title="Positive factors"
-        items={reasoning.positive_factors}
+        title="What works"
+        items={reason.positive_factors}
         color="var(--decision-launch)"
         Icon={Check}
       />
       <FactorList
-        title="Negative factors"
-        items={reasoning.negative_factors}
+        title="What doesn't"
+        items={reason.negative_factors}
         color="var(--decision-danger)"
         Icon={X}
       />
       <FactorList
-        title="Recommended actions"
-        items={reasoning.recommended_actions}
+        title="Recommended moves"
+        items={reason.recommended_actions}
         color="var(--primary)"
         Icon={Lightbulb}
       />

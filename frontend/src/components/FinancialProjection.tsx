@@ -1,7 +1,7 @@
-import type { ResultFinancials } from "@/lib/types";
+import type { Report } from "@/lib/types";
 
 interface FinancialProjectionProps {
-  financials: ResultFinancials;
+  financials: Report["financials"];
 }
 
 function fmtEUR(n: number): string {
@@ -17,14 +17,26 @@ interface Cell {
 
 export function FinancialProjection({ financials }: FinancialProjectionProps) {
   const cells: Cell[] = [
-    { label: "Expected monthly revenue", value: fmtEUR(financials.expected_monthly_revenue), tone: "primary" },
-    { label: "Expected monthly costs", value: fmtEUR(financials.expected_monthly_costs), tone: "neutral" },
+    {
+      label: "Expected monthly revenue",
+      value: fmtEUR(financials.expected_monthly_revenue),
+      tone: "primary",
+    },
+    {
+      label: "Expected monthly costs",
+      value: fmtEUR(financials.expected_monthly_costs),
+      tone: "neutral",
+    },
     {
       label: "Expected monthly profit",
       value: fmtEUR(financials.expected_monthly_profit),
       tone: financials.expected_monthly_profit >= 0 ? "positive" : "negative",
     },
-    { label: "Initial investment", value: fmtEUR(financials.estimated_initial_investment), tone: "neutral" },
+    {
+      label: "Initial investment",
+      value: fmtEUR(financials.estimated_initial_investment),
+      tone: "neutral",
+    },
     {
       label: "Break-even probability",
       value: `${Math.round(financials.break_even_probability * 100)}%`,
@@ -32,7 +44,7 @@ export function FinancialProjection({ financials }: FinancialProjectionProps) {
     },
     {
       label: "Payback period",
-      value: `${financials.payback_period_months} mo`,
+      value: financials.payback_period_months >= 999 ? "—" : `${financials.payback_period_months} mo`,
       tone: "neutral",
     },
   ];
@@ -53,14 +65,14 @@ export function FinancialProjection({ financials }: FinancialProjectionProps) {
         >
           <span
             aria-hidden
-            className="absolute left-0 top-0 h-full w-[2px] opacity-60"
+            className="absolute left-0 top-0 h-full w-[2px] opacity-60 transition-all"
             style={{ background: toneColor[c.tone ?? "neutral"] }}
           />
           <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
             {c.label}
           </p>
           <p
-            className="mt-2 text-xl font-semibold tabular-nums"
+            className="mt-2 text-xl font-semibold tabular-nums transition-all"
             style={{ color: toneColor[c.tone ?? "neutral"] }}
           >
             {c.value}

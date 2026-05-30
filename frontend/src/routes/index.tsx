@@ -1,14 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Header } from "@/components/Header";
 import { HeroSection } from "@/components/HeroSection";
 import { Stepper } from "@/components/Stepper";
 import { PitchStep } from "@/components/PitchStep";
-import { DynamicReviewStep } from "@/components/DynamicReviewStep";
+import { ConfirmDescriptions } from "@/components/ConfirmDescriptions";
+import { PollingLoader } from "@/components/PollingLoader";
 import { ResultsDashboard } from "@/components/ResultsDashboard";
 import {
   exampleChips,
-  graphLabels,
   heroCopy,
   navLinks,
   pitchPlaceholder,
@@ -16,8 +16,8 @@ import {
   stepDefinitions,
   trustFeatures,
 } from "@/lib/mockData";
-import { calculateResult, extractFields } from "@/lib/mockApi";
-import type { CalculationResult, EditableFieldGroup } from "@/lib/types";
+import { extract, confirm, getStatus, getResult } from "@/lib/mockApi";
+import type { Report, PipelineStep } from "@/lib/types";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -26,13 +26,12 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "MarketPilot converts an unstructured business idea into editable assumptions, market signals, probabilistic forecasts, financial projections, and a clear go/no-go recommendation.",
+          "Turn a raw business idea into probabilistic forecasts and a clear go/no-go decision.",
       },
       { property: "og:title", content: "MarketPilot — Forecast-driven launch decisions" },
       {
         property: "og:description",
-        content:
-          "An investor-grade decision cockpit for evaluating new business ideas before you launch.",
+        content: "An investor-grade decision cockpit for evaluating new business ideas.",
       },
       { property: "og:type", content: "website" },
     ],
@@ -40,43 +39,76 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
+type Phase = "idea" | "confirm" | "polling" | "results";
+
 function Index() {
-  const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [maxReached, setMaxReached] = useState<1 | 2 | 3>(1);
-  const [fieldGroups, setFieldGroups] = useState<EditableFieldGroup[] | null>(null);
-  const [result, setResult] = useState<CalculationResult | null>(null);
+  const [phase, setPhase] = useState<Phase>("idea");
   const [extracting, setExtracting] = useState(false);
-  const [calculating, setCalculating] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [descriptions, setDescriptions] = useState<string[]>([]);
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [pipelineStep, setPipelineStep] = useState<PipelineStep>("extracting");
+  const [report, setReport] = useState<Report | null>(null);
+
   const workflowRef = useRef<HTMLDivElement>(null);
 
   const scrollToWorkflow = useCallback(() => {
     workflowRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
 
+  // ─── Step 1: extract descriptions from pitch ─────────────────────────────
   const handleExtract = async (pitchText: string) => {
     setExtracting(true);
+    scrollToWorkflow();
     try {
-      const groups = await extractFields(pitchText);
-      setFieldGroups(groups);
-      setStep(2);
-      setMaxReached((m) => (m < 2 ? 2 : m));
+      const payload = await extract(pitchText);
+      setDescriptions(payload.descriptions);
+      setPhase("confirm");
     } finally {
       setExtracting(false);
     }
   };
 
-  const handleCalculate = async () => {
-    if (!fieldGroups) return;
-    setCalculating(true);
+  // ─── Step 2: confirm descriptions, kick off job ───────────────────────────
+  const handleConfirm = async () => {
+    setConfirming(true);
     try {
-      const res = await calculateResult(fieldGroups);
-      setResult(res);
-      setStep(3);
-      setMaxReached(3);
+      const res = await confirm(descriptions);
+      setJobId(res.job_id);
+      setPipelineStep("extracting");
+      setPhase("polling");
     } finally {
-      setCalculating(false);
+      setConfirming(false);
     }
   };
+
+  // ─── Polling loop ─────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (phase !== "polling" || !jobId) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const status = await getStatus(jobId);
+        setPipelineStep(status.step);
+        if (status.done) {
+          clearInterval(interval);
+          const result = await getResult(jobId);
+          setReport(result);
+          setPhase("results");
+        }
+      } catch {
+        clearInterval(interval);
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [phase, jobId]);
+
+  // Map phase → stepper step
+  const stepperCurrent: 1 | 2 | 3 =
+    phase === "idea" ? 1 : phase === "confirm" || phase === "polling" ? 2 : 3;
+  const stepperMaxReached: 1 | 2 | 3 =
+    phase === "results" ? 3 : phase === "confirm" || phase === "polling" ? 2 : 1;
 
   return (
     <div id="top" className="min-h-screen bg-background text-foreground">
@@ -86,6 +118,7 @@ function Index() {
         ctaLabel={heroCopy.ctaLabel}
         onCta={scrollToWorkflow}
       />
+
       <main>
         <HeroSection
           headline={heroCopy.headline}
@@ -109,21 +142,27 @@ function Index() {
               From idea to decision in minutes.
             </h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              Pitch the concept, edit the structured assumptions, then read the forecast-driven recommendation.
+              Pitch the concept, confirm the extracted market drivers, then read the
+              forecast-driven recommendation — with every assumption visible and
+              adjustable.
             </p>
           </div>
 
           <div className="mb-8">
             <Stepper
               steps={stepDefinitions}
-              current={step}
-              maxReached={maxReached}
-              onStepClick={(id) => setStep(id)}
+              current={stepperCurrent}
+              maxReached={stepperMaxReached}
+              onStepClick={(id) => {
+                if (id === 1 && phase !== "polling") setPhase("idea");
+                if (id === 2 && (phase === "results")) setPhase("confirm");
+                if (id === 3 && phase === "results") setPhase("results");
+              }}
             />
           </div>
 
           <div id="demo" className="scroll-mt-20">
-            {step === 1 && (
+            {phase === "idea" && (
               <PitchStep
                 placeholder={pitchPlaceholder}
                 examples={exampleChips}
@@ -132,17 +171,23 @@ function Index() {
               />
             )}
 
-            {step === 2 && fieldGroups && (
-              <DynamicReviewStep
-                groups={fieldGroups}
-                loading={calculating}
-                onChange={setFieldGroups}
-                onCalculate={handleCalculate}
+            {phase === "confirm" && (
+              <ConfirmDescriptions
+                descriptions={descriptions}
+                loading={confirming}
+                onChange={setDescriptions}
+                onConfirm={handleConfirm}
               />
             )}
 
-            {step === 3 && result && (
-              <ResultsDashboard result={result} graphLabels={graphLabels} />
+            {phase === "polling" && (
+              <div className="rounded-2xl border border-white/10 bg-card/60 shadow-[0_0_60px_-30px_var(--primary)] backdrop-blur">
+                <PollingLoader step={pipelineStep} />
+              </div>
+            )}
+
+            {phase === "results" && report && (
+              <ResultsDashboard report={report} />
             )}
           </div>
         </section>

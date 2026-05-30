@@ -24,7 +24,8 @@ export function PitchStep({ placeholder, examples, loading, onSubmit }: PitchSte
       <CardHeader className="space-y-1.5">
         <CardTitle className="text-xl">Describe your business idea</CardTitle>
         <CardDescription className="text-muted-foreground">
-          The agent identifies the business type, location, sales channels, target customers, forecast keywords, and relevant decision factors.
+          Be specific about location, concept, and target customer. The agent extracts
+          the quantifiable market factors that drive forecast accuracy.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
@@ -55,7 +56,8 @@ export function PitchStep({ placeholder, examples, loading, onSubmit }: PitchSte
         </div>
         <div className="flex items-center justify-between gap-3 pt-2">
           <p className="text-xs text-muted-foreground">
-            Your idea will be transformed into structured fields you can review before calculation.
+            Your idea will be parsed into market signal descriptions you can review
+            before the forecast runs.
           </p>
           <Button
             onClick={() => onSubmit(value.trim() || placeholder)}
@@ -66,7 +68,7 @@ export function PitchStep({ placeholder, examples, loading, onSubmit }: PitchSte
             {loading ? (
               <>
                 <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                Extracting editable assumptions...
+                Reading your idea…
               </>
             ) : (
               <>

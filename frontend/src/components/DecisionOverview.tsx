@@ -1,15 +1,12 @@
 import { cn } from "@/lib/utils";
 import { CheckCircle2, AlertTriangle, Clock, XCircle } from "lucide-react";
-import type { DecisionLabel, ResultDecision } from "@/lib/types";
+import type { DecisionLabel, Report } from "@/lib/types";
 
 interface DecisionOverviewProps {
-  decision: ResultDecision;
+  decision: Report["decision"];
 }
 
-const styleMap: Record<
-  DecisionLabel,
-  { token: string; icon: React.ReactNode; subtitle: string }
-> = {
+const STYLE: Record<DecisionLabel, { token: string; icon: React.ReactNode; subtitle: string }> = {
   Launch: {
     token: "launch",
     icon: <CheckCircle2 className="h-5 w-5" />,
@@ -33,13 +30,13 @@ const styleMap: Record<
 };
 
 export function DecisionOverview({ decision }: DecisionOverviewProps) {
-  const s = styleMap[decision.label];
+  const s = STYLE[decision.label];
   const cssVar = `var(--decision-${s.token})`;
   const softVar = `var(--decision-${s.token}-soft)`;
 
   return (
     <div
-      className="relative overflow-hidden rounded-2xl border border-white/10 bg-card/60 p-6 shadow-[0_0_80px_-30px_var(--primary)] backdrop-blur sm:p-8"
+      className="relative overflow-hidden rounded-2xl border border-white/10 bg-card/60 p-6 shadow-[0_0_80px_-30px_var(--primary)] backdrop-blur transition-all sm:p-8"
       style={{
         backgroundImage: `radial-gradient(60% 100% at 0% 0%, ${softVar}, transparent 60%)`,
       }}
@@ -51,7 +48,7 @@ export function DecisionOverview({ decision }: DecisionOverviewProps) {
           </p>
           <div className="flex flex-wrap items-center gap-3">
             <span
-              className="inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-sm font-semibold shadow-[0_0_24px_-6px_currentColor]"
+              className="inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-sm font-semibold shadow-[0_0_24px_-6px_currentColor] transition-all"
               style={{ backgroundColor: cssVar, color: "var(--background)" }}
             >
               {s.icon}
@@ -59,7 +56,7 @@ export function DecisionOverview({ decision }: DecisionOverviewProps) {
             </span>
             <span className="text-xs text-muted-foreground">{s.subtitle}</span>
           </div>
-          <p className="max-w-xl text-base leading-relaxed text-foreground/85">
+          <p className="max-w-xl text-base leading-relaxed text-foreground/85 transition-all">
             {decision.summary}
           </p>
         </div>
@@ -67,11 +64,15 @@ export function DecisionOverview({ decision }: DecisionOverviewProps) {
         <div className="grid grid-cols-3 gap-3">
           <StatTile
             label="Quality score"
-            value={`${decision.quality_score}`}
+            value={`${decision.score}`}
             sub="/ 100"
             accent={cssVar}
           />
-          <StatTile label="Risk level" value={decision.risk_level} accent="var(--decision-adapt)" />
+          <StatTile
+            label="Risk level"
+            value={decision.risk_level}
+            accent="var(--decision-adapt)"
+          />
           <StatTile
             label="Confidence"
             value={`${Math.round(decision.confidence * 100)}%`}
@@ -100,7 +101,7 @@ function StatTile({
         {label}
       </p>
       <p
-        className={cn("mt-2 text-2xl font-semibold tabular-nums")}
+        className={cn("mt-2 text-2xl font-semibold tabular-nums transition-all")}
         style={{ color: accent }}
       >
         {value}

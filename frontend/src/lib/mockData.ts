@@ -1,6 +1,7 @@
 import type {
-  CalculationResult,
-  EditableFieldGroup,
+  HistoricalPoint,
+  ForecastBandPoint,
+  Report,
   NavLink,
   StepDefinition,
 } from "./types";
@@ -15,233 +16,194 @@ export const navLinks: NavLink[] = [
 ];
 
 export const heroCopy = {
-  headline: "Turn business ideas into forecast-driven launch decisions.",
+  headline: "Forecast first. Launch second.",
   slogan: productSlogan,
   subheadline:
-    "MarketPilot converts an unstructured business idea into editable assumptions, market signals, probabilistic forecasts, financial projections, and a clear go/no-go recommendation.",
-  ctaLabel: "Start analysis",
+    "Turn a raw business idea into editable market signals, probabilistic revenue forecasts, and a go/no-go decision — with reasoning you can see and assumptions you can change.",
+  ctaLabel: "Analyze my idea",
 };
 
 export const trustFeatures: string[] = [
-  "Editable assumptions",
-  "Forecast drivers",
+  "Market signal extraction",
+  "Probabilistic forecasts",
   "Financial projection",
-  "Go / No-Go decision",
+  "Live what-if sensitivity",
 ];
 
 export const stepDefinitions: StepDefinition[] = [
-  { id: 1, label: "Idea input", description: "Describe the concept" },
-  { id: 2, label: "Review fields", description: "Edit assumptions" },
-  { id: 3, label: "Results dashboard", description: "Decision cockpit" },
+  { id: 1, label: "Idea input", description: "Describe your concept" },
+  { id: 2, label: "Confirm factors", description: "Review & refine drivers" },
+  { id: 3, label: "Decision cockpit", description: "Forecast-driven verdict" },
 ];
 
 export const exampleChips: string[] = [
-  "Wine store in Vienna",
-  "Online delivery",
-  "Premium café",
-  "Urban convenience store",
-  "Fitness studio",
+  "Ice cream shop in Vienna",
+  "Premium café in Berlin",
+  "Wine bar in Paris",
+  "Fitness studio in Amsterdam",
+  "Urban gelato kiosk",
 ];
 
 export const pitchPlaceholder =
-  "Example: I want to open a premium wine store in Vienna's 1st district with a focus on online delivery and corporate gift boxes.";
+  "Example: I want to open a premium ice cream shop in Vienna's 1st district focused on summer tourism and seasonal specials.";
 
 /**
- * Mock editable fields returned by the backend after extracting the pitch.
- * Grouped by category and fully generic — the Review step renders these
- * without hard-coding any field names.
+ * Mock descriptions returned by /api/extract.
+ * The backend extracts these from the free-text pitch.
  */
-export const mockEditableFieldGroups: EditableFieldGroup[] = [
-  {
-    category: "Business",
-    fields: [
-      { key: "business_type", label: "Business type", type: "text", value: "Premium wine store", confidence: "High" },
-      { key: "business_model", label: "Business model", type: "text", value: "Retail + tastings + online delivery" },
-      {
-        key: "pricing_position",
-        label: "Pricing position",
-        type: "select",
-        value: "Premium",
-        options: ["Budget", "Mid-market", "Premium", "Luxury"],
-        confidence: "Medium",
-      },
-      { key: "sales_channels", label: "Sales channels", type: "tags", value: ["Physical retail", "Online delivery"] },
-      {
-        key: "target_customers",
-        label: "Target customers",
-        type: "tags",
-        value: ["Tourists", "Locals", "Restaurants", "Corporate gifts"],
-      },
-    ],
-  },
-  {
-    category: "Location",
-    fields: [
-      { key: "city", label: "City", type: "text", value: "Vienna", confidence: "High" },
-      { key: "district", label: "District", type: "text", value: "1st district" },
-      { key: "country", label: "Country", type: "text", value: "Austria" },
-    ],
-  },
-  {
-    category: "Forecast Context",
-    fields: [
-      {
-        key: "forecast_target",
-        label: "Forecast target",
-        type: "text",
-        value: "Tourism-driven premium retail demand",
-        confidence: "Medium",
-      },
-      {
-        key: "forecast_keywords",
-        label: "Forecast keywords",
-        type: "tags",
-        value: [
-          "Vienna tourism",
-          "premium retail spending",
-          "wine retail",
-          "online delivery",
-          "consumer spending",
-          "seasonality",
-          "rent pressure",
-        ],
-      },
-      {
-        key: "forecast_horizon_months",
-        label: "Forecast horizon (months)",
-        type: "number",
-        value: 6,
-      },
-    ],
-  },
-  {
-    category: "Financial Assumptions",
-    fields: [
-      { key: "initial_investment", label: "Initial investment", type: "currency", value: 120000 },
-      { key: "monthly_rent", label: "Monthly rent", type: "currency", value: 8000 },
-      { key: "staff_costs", label: "Staff costs (monthly)", type: "currency", value: 12000 },
-      { key: "average_basket_size", label: "Average basket size", type: "currency", value: 42 },
-      { key: "gross_margin", label: "Gross margin", type: "percentage", value: 35 },
-    ],
-  },
-  {
-    category: "Market Signals",
-    fields: [
-      { key: "competition_level", label: "Competition level", type: "percentage", value: 65, helper: "Predicted relative density" },
-      { key: "tourism_index", label: "Tourism index", type: "percentage", value: 78 },
-      {
-        key: "market_signals",
-        label: "Tracked market signals",
-        type: "tags",
-        value: ["Premium retail spending", "Tourism demand", "Rent pressure", "Seasonality"],
-      },
-    ],
-  },
+export const mockDescriptions: string[] = [
+  "Average monthly rent for small retail units in Vienna's 1st district",
+  "Monthly consumer spending on ice cream and frozen desserts in Vienna",
+  "Tourism visitor volume in Vienna's 1st district by month",
+  "Seasonality index for ice cream and gelato sales in Central Europe",
+  "Competition density for dessert and ice cream shops in Vienna's 1st district",
 ];
 
-/**
- * Mock calculation result — matches the documented backend JSON shape.
- */
-export const mockCalculationResult: CalculationResult = {
+// ─── What-if baseline (used by recompute) ────────────────────────────────────
+
+export const BASELINE = {
+  monthly_rent: 5800,
+  average_basket_price: 8.5,
+  gross_margin_pct: 65,
+  /** Derived: base_revenue / base_basket_price */
+  customers_per_month: Math.round(24000 / 8.5), // ≈ 2824
+  staff_costs: 8500,
+  other_overhead: 1700,
+};
+
+// ─── Historical series (28 months: Jan 2024 – Apr 2026) ──────────────────────
+
+export const mockHistoricalSeries: HistoricalPoint[] = [
+  { month: "Jan '24", value: 3200 },
+  { month: "Feb '24", value: 3900 },
+  { month: "Mar '24", value: 8500 },
+  { month: "Apr '24", value: 15200 },
+  { month: "May '24", value: 21000 },
+  { month: "Jun '24", value: 28000 },
+  { month: "Jul '24", value: 34500 },
+  { month: "Aug '24", value: 32000 },
+  { month: "Sep '24", value: 19500 },
+  { month: "Oct '24", value: 11000 },
+  { month: "Nov '24", value: 5200 },
+  { month: "Dec '24", value: 7800 },
+  { month: "Jan '25", value: 3400 },
+  { month: "Feb '25", value: 4100 },
+  { month: "Mar '25", value: 9200 },
+  { month: "Apr '25", value: 16000 },
+  { month: "May '25", value: 22500 },
+  { month: "Jun '25", value: 29500 },
+  { month: "Jul '25", value: 36000 },
+  { month: "Aug '25", value: 33500 },
+  { month: "Sep '25", value: 20500 },
+  { month: "Oct '25", value: 12000 },
+  { month: "Nov '25", value: 5500 },
+  { month: "Dec '25", value: 8200 },
+  { month: "Jan '26", value: 3600 },
+  { month: "Feb '26", value: 4300 },
+  { month: "Mar '26", value: 9800 },
+  { month: "Apr '26", value: 17000 },
+];
+
+// ─── Forecast (6 months: May 2026 – Oct 2026) ────────────────────────────────
+
+export const mockDemandForecast: ForecastBandPoint[] = [
+  { month: "May '26", low: 19000, mid: 24800, high: 33000 },
+  { month: "Jun '26", low: 24500, mid: 32000, high: 42000 },
+  { month: "Jul '26", low: 29000, mid: 37500, high: 48500 },
+  { month: "Aug '26", low: 27000, mid: 35500, high: 46500 },
+  { month: "Sep '26", low: 14000, mid: 21000, high: 29000 },
+  { month: "Oct '26", low: 8000, mid: 12500, high: 18000 },
+];
+
+// ─── Full mock report ─────────────────────────────────────────────────────────
+
+export const mockReport: Report = {
   decision: {
     label: "Adapt concept",
-    quality_score: 72,
+    score: 67,
     risk_level: "Medium",
-    confidence: 0.68,
+    confidence: 0.71,
     summary:
-      "The concept has demand potential, but predicted rent pressure creates downside risk.",
+      "Strong summer tourism demand powers the upside, but winter dead seasons and 1st-district rent pressure create meaningful downside risk. The concept works — but only if the off-season is managed aggressively.",
   },
   financials: {
-    expected_monthly_revenue: 42000,
-    expected_monthly_costs: 37800,
-    expected_monthly_profit: 4200,
-    estimated_initial_investment: 120000,
-    break_even_probability: 0.67,
-    payback_period_months: 29,
+    expected_monthly_revenue: 24000,
+    expected_monthly_costs: 21500,
+    expected_monthly_profit: 2500,
+    estimated_initial_investment: 95000,
+    break_even_probability: 0.63,
+    payback_period_months: 38,
   },
-  investment_breakdown: [
-    { category: "Initial inventory", amount: 45000 },
-    { category: "Store setup", amount: 35000 },
-    { category: "Launch marketing", amount: 15000 },
-    { category: "Legal and licensing", amount: 5000 },
-    { category: "Cash buffer", amount: 20000 },
-  ],
   graphs: {
-    demand_forecast: [
-      { month: "2026-06", p10: 820, p50: 1040, p90: 1280 },
-      { month: "2026-07", p10: 860, p50: 1090, p90: 1350 },
-      { month: "2026-08", p10: 910, p50: 1160, p90: 1440 },
-      { month: "2026-09", p10: 760, p50: 980, p90: 1210 },
-      { month: "2026-10", p10: 700, p50: 930, p90: 1160 },
-      { month: "2026-11", p10: 780, p50: 990, p90: 1240 },
-    ],
-    rent_forecast: [
-      { month: "2026-06", p10: 7600, p50: 8200, p90: 9100 },
-      { month: "2026-07", p10: 7700, p50: 8350, p90: 9300 },
-      { month: "2026-08", p10: 7800, p50: 8500, p90: 9500 },
-      { month: "2026-09", p10: 7900, p50: 8700, p90: 9800 },
-      { month: "2026-10", p10: 8000, p50: 8900, p90: 10100 },
-      { month: "2026-11", p10: 8100, p50: 9100, p90: 10400 },
-    ],
-    revenue_forecast: [
-      { month: "2026-06", p10: 33000, p50: 42000, p90: 51000 },
-      { month: "2026-07", p10: 34000, p50: 43500, p90: 53000 },
-      { month: "2026-08", p10: 36000, p50: 46000, p90: 56000 },
-      { month: "2026-09", p10: 31000, p50: 39500, p90: 49000 },
-      { month: "2026-10", p10: 30000, p50: 38000, p90: 47000 },
-      { month: "2026-11", p10: 32000, p50: 40500, p90: 50000 },
-    ],
+    historical_series: mockHistoricalSeries,
+    demand_forecast: mockDemandForecast,
   },
   drivers: [
     {
-      name: "Premium retail spending",
-      importance: 0.78,
+      name: "Summer tourism",
+      importance: 0.84,
       direction: "positive",
-      explanation: "Premium retail demand supports the concept.",
-    },
-    {
-      name: "Rent pressure",
-      importance: 0.73,
-      direction: "negative",
-      explanation: "Predicted rent pressure increases fixed cost risk.",
-    },
-    {
-      name: "Tourism demand",
-      importance: 0.71,
-      direction: "positive",
-      explanation: "Tourism demand increases upside potential.",
+      horizon: { month_1: 0.84, month_3: 0.79, month_6: 0.52 },
+      explanation: "Vienna's 1st-district tourist volume is the primary demand driver — peak July and August are make-or-break months.",
     },
     {
       name: "Seasonality",
-      importance: 0.61,
+      importance: 0.77,
       direction: "mixed",
-      explanation: "Seasonality creates demand volatility.",
+      horizon: { month_1: 0.65, month_3: 0.82, month_6: 0.77 },
+      explanation: "Demand swings 10× between peak summer and deep winter — managing cash flow across this cycle is the core operational challenge.",
+    },
+    {
+      name: "Rent pressure",
+      importance: 0.62,
+      direction: "negative",
+      horizon: { month_1: 0.58, month_3: 0.62, month_6: 0.67 },
+      explanation: "1st-district commercial rents are forecast to rise. Fixed-cost base increases while winter revenue stays flat.",
+    },
+    {
+      name: "Competition density",
+      importance: 0.51,
+      direction: "negative",
+      horizon: { month_1: 0.49, month_3: 0.53, month_6: 0.55 },
+      explanation: "The tourist corridor supports multiple players, but differentiation is critical to avoid price competition.",
+    },
+    {
+      name: "Consumer spending",
+      importance: 0.48,
+      direction: "positive",
+      horizon: { month_1: 0.52, month_3: 0.47, month_6: 0.43 },
+      explanation: "Vienna's high spending index supports premium pricing and above-average basket sizes.",
     },
   ],
-  reasoning: {
+  investment_breakdown: [
+    { category: "Equipment (soft-serve, display)", amount: 30000 },
+    { category: "Store fit-out & décor", amount: 25000 },
+    { category: "Launch marketing & activation", amount: 10000 },
+    { category: "Initial inventory & supplies", amount: 8000 },
+    { category: "Legal, licensing & permits", amount: 7000 },
+    { category: "Cash buffer (winter reserve)", amount: 15000 },
+  ],
+  reason: {
     main_reason:
-      "The concept has demand potential, but predicted rent pressure creates downside risk.",
+      "The concept is forecast-viable in peak months, but the annual average is pulled down by winter dead seasons. The risk is cashflow, not concept.",
     positive_factors: [
-      "Premium retail demand supports the wine store concept.",
-      "Online delivery expands customer reach.",
-      "Tourism demand increases upside potential.",
+      "Summer tourism creates a highly predictable demand surge from June through August.",
+      "Vienna's high consumer spending supports premium pricing and €8–12 average baskets.",
+      "Seasonal specials and event catering can add non-weather-dependent revenue.",
     ],
     negative_factors: [
-      "Predicted rent pressure increases fixed costs.",
-      "Seasonality creates demand volatility.",
-      "Competition density limits customer capture.",
+      "Winter revenue (Jan–Feb) covers less than 25% of fixed monthly costs.",
+      "1st-district rent is projected to increase 4–6% annually over the forecast horizon.",
+      "Heavy concentration of dessert options in the tourist corridor limits pricing power.",
     ],
     recommended_actions: [
-      "Adapt the concept toward online delivery and corporate gift boxes.",
-      "Avoid high-rent leases above the predicted threshold.",
-      "Add tastings or B2B sales to improve margins.",
+      "Negotiate a seasonal lease to avoid paying peak rent through the winter dead period.",
+      "Launch a hot drinks and winter specials menu from October to offset demand seasonality.",
+      "Pre-build summer capacity (event boxes, catering partnerships) before the first peak season.",
     ],
   },
-};
-
-/** Pretty labels for the graphs map keys. */
-export const graphLabels: Record<string, string> = {
-  demand_forecast: "Demand forecast",
-  rent_forecast: "Rent price forecast",
-  revenue_forecast: "Revenue forecast",
+  backtest: {
+    quality: "medium-high",
+    mape: 11.3,
+  },
 };
