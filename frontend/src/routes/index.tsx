@@ -17,7 +17,12 @@ import {
   trustFeatures,
 } from "@/lib/mockData";
 import { extract, confirm, getStatus, getResult } from "@/lib/mockApi";
-import { extractDescriptionsFromEndpoint } from "@/lib/api";
+import { mockReport } from "@/lib/mockData";
+import {
+  extractDescriptionsFromEndpoint,
+  confirmDescriptionsWithEndpoint,
+  adaptConfirmResponseToReport,
+} from "@/lib/api";
 import type { DataMode } from "@/lib/api";
 import type { Report, PipelineStep } from "@/lib/types";
 
@@ -54,6 +59,7 @@ function Index() {
   // Temporary dev control for switching between mock data and backend endpoint.
   const [dataMode, setDataMode] = useState<DataMode>("mock");
   const [extractError, setExtractError] = useState<string | null>(null);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
 
   const workflowRef = useRef<HTMLDivElement>(null);
 
@@ -92,11 +98,31 @@ function Index() {
   // ─── Step 2: confirm descriptions, kick off job ───────────────────────────
   const handleConfirm = async () => {
     setConfirming(true);
+    setConfirmError(null);
     try {
-      const res = await confirm(descriptions);
-      setJobId(res.job_id);
-      setPipelineStep("extracting");
-      setPhase("polling");
+      if (dataMode === "mock") {
+        const res = await confirm(descriptions);
+        setJobId(res.job_id);
+        setPipelineStep("extracting");
+        setPhase("polling");
+      } else {
+        // Endpoint mode: backend confirm is synchronous — show loader while waiting.
+        setPipelineStep("forecasting");
+        setPhase("polling");
+        try {
+          const res = await confirmDescriptionsWithEndpoint(descriptions);
+          const adapted = adaptConfirmResponseToReport(res, mockReport);
+          setReport(adapted);
+          setPhase("results");
+        } catch (err) {
+          setConfirmError(
+            err instanceof Error
+              ? err.message
+              : "Backend forecast confirmation failed. Check that the backend is running on http://127.0.0.1:8003.",
+          );
+          setPhase("confirm");
+        }
+      }
     } finally {
       setConfirming(false);
     }
@@ -225,12 +251,20 @@ function Index() {
             )}
 
             {phase === "confirm" && (
-              <ConfirmDescriptions
-                descriptions={descriptions}
-                loading={confirming}
-                onChange={setDescriptions}
-                onConfirm={handleConfirm}
-              />
+              <div className="space-y-3">
+                {confirmError && (
+                  <div className="flex items-start gap-2.5 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                    <span className="mt-0.5 shrink-0">⚠</span>
+                    <span>{confirmError}</span>
+                  </div>
+                )}
+                <ConfirmDescriptions
+                  descriptions={descriptions}
+                  loading={confirming}
+                  onChange={setDescriptions}
+                  onConfirm={handleConfirm}
+                />
+              </div>
             )}
 
             {phase === "polling" && (

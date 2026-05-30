@@ -1,0 +1,35 @@
+- id: statistik_austria_open_data
+  name: Statistik Austria Open Data
+  type: csv_catalog
+  base_url: https://data.statistik.gv.at
+  access: public
+  auth_required: false
+  formats: [csv, ods]
+  domains: [housing, prices, demographics, economy]
+
+- id: eurostat
+  name: Eurostat Statistics API
+  type: jsonstat_api
+  base_url: https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data
+  access: public
+  auth_required: false
+  formats: [jsonstat]
+  domains: [housing, prices, demographics, economy, labor]
+
+- id: statcube_api
+  name: Statistik Austria STATcube API
+  type: rest_api
+  base_url: https://statcubeapi.statistik.at/statistik.at/ext/statcube/rest/v1
+  access: subscription
+  auth_required: true
+  formats: [json]
+  domains: [housing, prices, demographics, economy]
+
+- id: yahoo_finance_commodities
+  name: Yahoo Finance Commodities
+  type: market_data_api
+  base_url: https://query1.finance.yahoo.com/v8/finance/chart
+  access: public
+  auth_required: false
+  formats: [json]
+  domains: [commodities, energy, metals, agriculture, livestock, logistics, materials]

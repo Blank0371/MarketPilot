@@ -1,0 +1,83 @@
+- id: statistik_austria_housing_costs
+  source_id: statistik_austria_open_data
+  title: Housing costs / Wohnkosten
+  verified: true
+  domain: housing
+  metrics: [average_rent, housing_costs]
+  time_series: true
+  geo_granularity: [austria, federal_state, city]
+  supports_vienna_districts: false
+  limitations:
+    - "No verified district-level rent time series"
+
+- id: eurostat_hicp_rent_index_austria
+  source_id: eurostat
+  title: HICP actual rentals for housing (Austria)
+  verified: true
+  domain: housing
+  metrics: [average_rent]
+  time_series: true
+  geo_granularity: [austria]
+  supports_vienna_districts: false
+  limitations:
+    - "National-level index, not district-level EUR/m2 price series"
+
+- id: eurostat_hicp_all_items
+  source_id: eurostat
+  title: HICP all-items consumer price index
+  verified: true
+  domain: economy
+  metrics: [inflation_index]
+  time_series: true
+  geo_granularity: [country, eu_aggregate]
+  supports_vienna_districts: false
+  limitations:
+    - "Consumer-price index, not direct profitability metric"
+
+- id: eurostat_unemployment_rate
+  source_id: eurostat
+  title: Unemployment by sex and age - monthly rate
+  verified: true
+  domain: labor
+  metrics: [unemployment_rate]
+  time_series: true
+  geo_granularity: [country, eu_aggregate]
+  supports_vienna_districts: false
+  limitations:
+    - "Published as labor-force percentage, national aggregate"
+
+- id: eurostat_gdp_nominal_quarterly
+  source_id: eurostat
+  title: Quarterly GDP at market prices (nominal)
+  verified: true
+  domain: economy
+  metrics: [gdp_nominal]
+  time_series: true
+  geo_granularity: [country, eu_aggregate]
+  supports_vienna_districts: false
+  limitations:
+    - "Quarterly national accounts aggregate"
+
+- id: statcube_housing
+  source_id: statcube_api
+  title: Housing indicators (subscription)
+  verified: true
+  domain: housing
+  metrics: [average_rent]
+  time_series: true
+  geo_granularity: [austria, federal_state]
+  supports_vienna_districts: false
+  limitations:
+    - "Requires subscription credentials"
+
+- id: yahoo_finance_commodities_monthly
+  source_id: yahoo_finance_commodities
+  title: Yahoo Finance Commodity Market Series (monthly)
+  verified: true
+  domain: commodities
+  metrics: [commodity_price]
+  time_series: true
+  geo_granularity: [global]
+  supports_vienna_districts: false
+  limitations:
+    - "Mostly futures/market proxies, not official local spot prices"
