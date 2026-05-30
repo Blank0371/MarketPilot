@@ -53,25 +53,15 @@ export function PollingLoader({ step }: PollingLoaderProps) {
 
   return (
     <div className="flex flex-col items-center gap-10 py-16 select-none">
-      {/* Central animated orb */}
+      {/* Icon orb — single static glow, no ping rings */}
       <div className="relative flex items-center justify-center">
+        {/* Soft ambient halo — CSS only, no animation */}
         <span
-          className="absolute inline-block rounded-full opacity-30 animate-ping"
+          className="absolute rounded-full opacity-20 blur-2xl"
           style={{
             width: 96,
             height: 96,
             background: "radial-gradient(circle, var(--primary), var(--accent))",
-            animationDuration: "2s",
-          }}
-        />
-        <span
-          className="absolute inline-block rounded-full opacity-15 animate-ping"
-          style={{
-            width: 128,
-            height: 128,
-            background: "radial-gradient(circle, var(--primary), var(--accent))",
-            animationDuration: "2.8s",
-            animationDelay: "0.4s",
           }}
         />
         <span
@@ -90,7 +80,7 @@ export function PollingLoader({ step }: PollingLoaderProps) {
         <p className="text-sm text-muted-foreground leading-relaxed">{current.copy}</p>
       </div>
 
-      {/* Progress track */}
+      {/* Progress track — promoted as the primary progress indicator */}
       <ol className="flex items-center gap-0" aria-label="Pipeline progress">
         {STEPS.filter((s) => s.id !== "done").map((s, idx) => {
           const stepIdx = STEP_ORDER.indexOf(s.id);
@@ -98,10 +88,10 @@ export function PollingLoader({ step }: PollingLoaderProps) {
           const active = stepIdx === currentIdx;
           return (
             <li key={s.id} className="flex items-center">
-              <div className="flex flex-col items-center gap-1.5">
+              <div className="flex flex-col items-center gap-2">
                 <div
                   className={cn(
-                    "h-2 w-2 rounded-full transition-all duration-500",
+                    "h-2.5 w-2.5 rounded-full transition-all duration-500",
                     done
                       ? "scale-100 bg-primary shadow-[0_0_8px_2px_var(--primary)]"
                       : active
@@ -112,7 +102,11 @@ export function PollingLoader({ step }: PollingLoaderProps) {
                 <span
                   className={cn(
                     "text-[10px] font-medium transition-colors hidden sm:block",
-                    active ? "text-foreground/90" : "text-muted-foreground/50",
+                    done
+                      ? "text-primary/70"
+                      : active
+                      ? "text-foreground/90"
+                      : "text-muted-foreground/40",
                   )}
                 >
                   {s.label.split(" ")[0]}
@@ -121,8 +115,10 @@ export function PollingLoader({ step }: PollingLoaderProps) {
               {idx < STEPS.length - 2 && (
                 <div
                   className={cn(
-                    "mx-2 h-px w-10 transition-all duration-700 sm:w-16",
-                    done ? "bg-primary" : "bg-secondary/40",
+                    "mx-3 h-px w-10 transition-all duration-700 sm:w-16",
+                    done
+                      ? "bg-gradient-to-r from-primary/40 to-primary/20"
+                      : "bg-secondary/40",
                   )}
                 />
               )}

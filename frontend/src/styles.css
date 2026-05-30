@@ -96,9 +96,15 @@
   --accent-foreground: oklch(0.98 0.005 290);
   --destructive: oklch(0.65 0.23 25);
   --destructive-foreground: oklch(0.98 0.005 25);
-  --border: oklch(1 0 0 / 8%);                    /* subtle slate-700 w/ opacity */
-  --input: oklch(1 0 0 / 10%);
+  --border: oklch(1 0 0 / 10%);                   /* unified border: 10% white */
+  --input: oklch(1 0 0 / 12%);
   --ring: oklch(0.74 0.16 225 / 60%);
+
+  /* Glow shadow scale — use via shadow-[var(--glow-sm)] etc. */
+  --glow-sm:  0 0 24px -8px  oklch(0.74 0.16 225 / 45%);
+  --glow-md:  0 0 48px -16px oklch(0.74 0.16 225 / 50%);
+  --glow-lg:  0 0 80px -24px oklch(0.74 0.16 225 / 55%);
+  --glow-accent-sm: 0 0 24px -8px oklch(0.62 0.22 290 / 40%);
 
   --chart-1: oklch(0.74 0.16 225);                /* cyan/blue */
   --chart-2: oklch(0.62 0.22 290);                /* violet */
@@ -174,6 +180,7 @@
     color: var(--color-foreground);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     background-image:
       radial-gradient(1200px 600px at 15% -10%, oklch(0.74 0.16 225 / 12%), transparent 60%),
       radial-gradient(900px 500px at 95% 5%, oklch(0.62 0.22 290 / 10%), transparent 65%);
@@ -182,6 +189,22 @@
 
   h1, h2, h3 {
     font-family: var(--font-display);
+  }
+
+  ::selection {
+    background-color: oklch(0.74 0.16 225 / 28%);
+    color: oklch(0.97 0.01 250);
+  }
+
+  /* Thin scrollbar matching the cockpit palette */
+  ::-webkit-scrollbar        { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track  { background: transparent; }
+  ::-webkit-scrollbar-thumb  {
+    background: oklch(1 0 0 / 14%);
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: oklch(1 0 0 / 24%);
   }
 }
 

@@ -141,7 +141,7 @@ function Section({
     <section className="space-y-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h3 className="text-sm font-semibold text-foreground/90">{title}</h3>
+          <h3 className="text-base font-semibold text-foreground/90">{title}</h3>
           {description && (
             <p className="text-xs text-muted-foreground">{description}</p>
           )}

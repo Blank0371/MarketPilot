@@ -131,7 +131,7 @@ export function AddMarketFactor({ baseReport, onComparisonUpdate }: AddMarketFac
             onClick={() => submit(input)}
             disabled={loading || !input.trim()}
             size="sm"
-            className="shrink-0 bg-gradient-to-r from-accent to-primary font-medium text-primary-foreground shadow-[0_0_20px_-6px_var(--accent)] hover:opacity-95"
+            className="shrink-0 bg-gradient-to-r from-primary to-accent font-medium text-primary-foreground shadow-[0_0_20px_-6px_var(--primary)] hover:opacity-95"
           >
             {loading ? (
               <>

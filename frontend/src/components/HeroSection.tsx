@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight, BarChart3 } from "lucide-react";
 
 interface HeroSectionProps {
   headline: string;
@@ -41,11 +41,11 @@ export function HeroSection({
       <div className="relative mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8 lg:py-32">
         <div className="mx-auto max-w-4xl text-center">
           <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-card/60 px-3 py-1 text-xs font-medium text-muted-foreground shadow-[0_0_30px_-12px_var(--primary)] backdrop-blur">
-            <Sparkles className="h-3.5 w-3.5 text-primary" />
+            <BarChart3 className="h-3.5 w-3.5 text-primary" />
             {slogan}
           </span>
 
-          <h1 className="mt-6 text-balance bg-gradient-to-b from-foreground to-foreground/65 bg-clip-text text-5xl font-bold tracking-tight text-transparent sm:text-6xl lg:text-7xl">
+          <h1 className="mt-6 text-balance bg-gradient-to-b from-foreground via-foreground/90 to-primary/70 bg-clip-text text-5xl font-bold tracking-tight text-transparent sm:text-6xl lg:text-7xl">
             {headline}
           </h1>
 
@@ -74,7 +74,7 @@ export function HeroSection({
             {features.map((feature) => (
               <li
                 key={feature}
-                className="rounded-full border border-white/10 bg-card/60 px-3.5 py-1.5 text-xs font-medium text-foreground/80 shadow-sm backdrop-blur"
+                className="rounded-full border border-white/10 bg-card/60 px-3.5 py-1.5 text-xs font-medium text-foreground/80 shadow-sm backdrop-blur transition-colors hover:border-primary/30 hover:text-foreground"
               >
                 {feature}
               </li>

@@ -36,9 +36,10 @@ export function DecisionOverview({ decision }: DecisionOverviewProps) {
 
   return (
     <div
-      className="relative overflow-hidden rounded-2xl border border-white/10 bg-card/60 p-6 shadow-[0_0_80px_-30px_var(--primary)] backdrop-blur transition-all sm:p-8"
+      className="relative overflow-hidden rounded-2xl border border-white/10 bg-card/60 p-6 backdrop-blur transition-all sm:p-8"
       style={{
         backgroundImage: `radial-gradient(60% 100% at 0% 0%, ${softVar}, transparent 60%)`,
+        boxShadow: `0 0 80px -30px ${cssVar}66`,
       }}
     >
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1.2fr_1fr] lg:items-center">
@@ -46,16 +47,27 @@ export function DecisionOverview({ decision }: DecisionOverviewProps) {
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             Decision recommendation
           </p>
-          <div className="flex flex-wrap items-center gap-3">
+
+          {/* Verdict heading — largest element in the cockpit */}
+          <div
+            className="text-4xl font-bold tracking-tight transition-all sm:text-5xl"
+            style={{ color: cssVar }}
+          >
+            {decision.label}
+          </div>
+
+          {/* Status pill — icon + subtitle, demoted to supporting role */}
+          <div className="flex flex-wrap items-center gap-2.5">
             <span
-              className="inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-sm font-semibold shadow-[0_0_24px_-6px_currentColor] transition-all"
-              style={{ backgroundColor: cssVar, color: "var(--background)" }}
+              className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold shadow-[0_0_16px_-4px_currentColor] transition-all"
+              style={{ backgroundColor: `${cssVar}22`, color: cssVar, border: `1px solid ${cssVar}55` }}
             >
               {s.icon}
               {decision.label}
             </span>
             <span className="text-xs text-muted-foreground">{s.subtitle}</span>
           </div>
+
           <p className="max-w-xl text-base leading-relaxed text-foreground/85 transition-all">
             {decision.summary}
           </p>

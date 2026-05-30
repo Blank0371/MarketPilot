@@ -62,12 +62,11 @@ export function FinancialProjection({ financials }: FinancialProjectionProps) {
         <div
           key={c.label}
           className="group relative overflow-hidden rounded-xl border border-white/10 bg-card/60 p-4 backdrop-blur transition-colors hover:border-white/20"
+          style={{
+            borderTop: `2px solid ${toneColor[c.tone ?? "neutral"]}`,
+            boxShadow: `inset 0 2px 12px -6px ${toneColor[c.tone ?? "neutral"]}40`,
+          }}
         >
-          <span
-            aria-hidden
-            className="absolute left-0 top-0 h-full w-[2px] opacity-60 transition-all"
-            style={{ background: toneColor[c.tone ?? "neutral"] }}
-          />
           <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
             {c.label}
           </p>

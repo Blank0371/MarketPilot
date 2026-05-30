@@ -57,7 +57,15 @@ export function Stepper({ steps, current, maxReached, onStepClick }: StepperProp
               </div>
             </button>
             {idx < steps.length - 1 && (
-              <span className="hidden h-px flex-1 bg-gradient-to-r from-white/10 to-transparent md:block" aria-hidden />
+              <span
+                className={cn(
+                  "hidden h-px flex-1 transition-colors duration-500 md:block",
+                  isComplete
+                    ? "bg-gradient-to-r from-primary/30 to-primary/10"
+                    : "bg-gradient-to-r from-white/10 to-transparent",
+                )}
+                aria-hidden
+              />
             )}
           </li>
         );
