@@ -44,6 +44,20 @@ export function HeroSection({
 
           {/* ── Left: hero text ───────────────────────────────────────────── */}
           <div className="text-center lg:text-left">
+
+            {/* Brand mark */}
+            <div className="mb-8 flex justify-center lg:justify-start">
+              <div className="relative flex h-28 w-28 items-center justify-center rounded-3xl bg-gradient-to-br from-primary/50 to-accent/35 shadow-[0_0_80px_-8px_var(--primary)] ring-1 ring-primary/30">
+                {/* outer glow ring */}
+                <div className="absolute inset-0 rounded-3xl opacity-40 blur-md bg-gradient-to-br from-primary/60 to-accent/40" />
+                <img
+                  src="/brand/logo.png"
+                  alt="MarketPilot logo"
+                  className="relative h-36 w-36 object-contain brightness-[2.2] drop-shadow-[0_0_10px_rgba(255,255,255,0.7)]"
+                />
+              </div>
+            </div>
+
             <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-card/60 px-3 py-1 text-xs font-medium text-muted-foreground shadow-[0_0_30px_-12px_var(--primary)] backdrop-blur">
               <BarChart3 className="h-3.5 w-3.5 text-primary" />
               {slogan}
