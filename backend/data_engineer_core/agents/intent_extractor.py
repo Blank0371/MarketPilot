@@ -49,6 +49,18 @@ class IntentExtractor:
     def detect_metric(text: str) -> tuple[str, str, str | None]:
         rules: list[tuple[str, str, str | None, list[str]]] = [
             (
+                "tourism_nights",
+                "tourism",
+                "nights",
+                ["tourism", "tourist", "overnight", "nights", "accommodation", "foot traffic", "festival"],
+            ),
+            (
+                "gross_wages_index",
+                "labor",
+                "index_2021_100",
+                ["wage", "salary", "staff costs", "payroll", "benefits", "gross wages"],
+            ),
+            (
                 "commodity_price",
                 "commodities",
                 "usd",
