@@ -3,7 +3,7 @@ import { ShieldCheck } from "lucide-react";
 import type { Backtest } from "@/lib/types";
 
 interface BacktestBadgeProps {
-  backtest: Backtest;
+  backtest?: Backtest | null;
   className?: string;
 }
 
@@ -16,6 +16,7 @@ const QUALITY_COLOR: Record<string, string> = {
 };
 
 export function BacktestBadge({ backtest, className }: BacktestBadgeProps) {
+  if (!backtest) return null;
   const color = QUALITY_COLOR[backtest.quality.toLowerCase()] ?? "text-muted-foreground";
   return (
     <div

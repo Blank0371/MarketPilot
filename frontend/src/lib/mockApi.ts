@@ -111,45 +111,76 @@ export async function mockRecalculateWithOverrides(
 ): Promise<ComparisonResult> {
   await delay(120); // simulate slight async
 
-  // ── Read overrides (fall back to base values from ECONOMICS) ──────────────
-  const basket = (overrides["average_basket_size"] as number) ?? ECONOMICS.base_basket_size;
-  const margin = (overrides["gross_margin"] as number) ?? 0.35;
-  const staffing = (overrides["staffing_level"] as number) ?? 1;
-  const days = (overrides["opening_days_per_month"] as number) ?? ECONOMICS.base_opening_days;
-  const investment = (overrides["initial_investment_budget"] as number) ?? 120000;
-  const price_level = (overrides["product_price_level"] as string) ?? "premium";
+  // ── Base values (defaults) ─────────────────────────────────────────────────
+  const BASE_BASKET  = ECONOMICS.base_basket_size;   // 42 EUR
+  const BASE_DAYS    = ECONOMICS.base_opening_days;  // 22 days
+  const BASE_MARGIN  = 0.35;
+  const BASE_STAFF   = 1;                            // employees
+
+  // ── Read overrides ────────────────────────────────────────────────────────
+  const basket      = (overrides["average_basket_size"]      as number) ?? BASE_BASKET;
+  const margin      = (overrides["gross_margin"]             as number) ?? BASE_MARGIN;
+  const staffing    = (overrides["staffing_level"]           as number) ?? BASE_STAFF;
+  const days        = (overrides["opening_days_per_month"]   as number) ?? BASE_DAYS;
+  const investment  = (overrides["initial_investment_budget"] as number) ?? 120000;
+  const price_level = (overrides["product_price_level"]      as string) ?? "premium";
 
   const demand_mult = DEMAND_MULT[price_level] ?? 1.0;
 
-  // ── Revenue ───────────────────────────────────────────────────────────────
-  const new_revenue = Math.round(
-    ECONOMICS.daily_customers * basket * days * demand_mult,
-  );
+  // ── Anchor to baseReport so values match exactly when sliders are at defaults
+  //
+  //   Revenue scales proportionally:
+  //     new_revenue = base_revenue × (basket/BASE_BASKET) × (days/BASE_DAYS) × demand_mult
+  //   This guarantees: at base values → new_revenue == baseReport.financials.expected_monthly_revenue
+  //
+  //   Costs delta:
+  //     COGS change = new_revenue×(1−margin) − base_revenue×(1−BASE_MARGIN)
+  //     Staff change = (staffing − BASE_STAFF) × staff_cost_per_employee
+  //     Fixed overhead unchanged
+  //   This guarantees: at base values → new_costs == baseReport.financials.expected_monthly_costs
+  // ─────────────────────────────────────────────────────────────────────────
+  const base_revenue = baseReport.financials.expected_monthly_revenue;
+  const base_costs   = baseReport.financials.expected_monthly_costs;
 
-  // ── Costs ─────────────────────────────────────────────────────────────────
-  const cogs = new_revenue * (1 - margin);
-  const staff_cost = staffing * ECONOMICS.staff_cost_per_employee;
-  const new_costs = Math.round(cogs + staff_cost + ECONOMICS.fixed_overhead);
-  const new_profit = new_revenue - new_costs;
+  const revenue_scale = (basket / BASE_BASKET) * (days / BASE_DAYS) * demand_mult;
+  const new_revenue   = Math.round(base_revenue * revenue_scale);
+
+  const cogs_delta  = new_revenue * (1 - margin) - base_revenue * (1 - BASE_MARGIN);
+  const staff_delta = (staffing - BASE_STAFF) * ECONOMICS.staff_cost_per_employee;
+  const new_costs   = Math.round(base_costs + cogs_delta + staff_delta);
+
+  const new_profit   = new_revenue - new_costs;
   const profit_margin = new_revenue > 0 ? new_profit / new_revenue : -1;
 
-  // ── Verdict ───────────────────────────────────────────────────────────────
+  // ── Verdict, BEP, Risk — all anchored to baseReport ──────────────────────
+  //
+  //   BEP: shift from base_bep proportional to the profit-margin change.
+  //     At base values → delta = 0 → new_bep == base_bep exactly.
+  //
+  //   Risk: derived from new_bep so the two stay consistent with each other.
+  //     At base values → new_bep == base_bep → same risk band as baseReport.
+  // ─────────────────────────────────────────────────────────────────────────
+  const base_profit  = baseReport.financials.expected_monthly_profit;
+  const base_bep     = baseReport.financials.break_even_probability;
+  const base_margin  = base_revenue > 0 ? base_profit / base_revenue : 0;
+
+  const margin_delta = profit_margin - base_margin;
+  const new_bep      = Math.max(0.05, Math.min(0.97, base_bep + margin_delta * 2.5));
+  const new_risk     = deriveRiskFromBep(new_bep);
   const new_decision = deriveVerdict(profit_margin);
-  const new_risk = deriveRiskLevel(profit_margin);
-  const new_bep = Math.max(0.05, Math.min(0.97, 0.35 + profit_margin * 2.5));
-  const payback = new_profit > 0 ? Math.round(investment / new_profit) : 999;
-  void payback; // payback used in fuller reports; included here for completeness
+  const payback      = new_profit > 0 ? Math.round(investment / new_profit) : 999;
+  void payback;
 
   // ── Changed assumptions ───────────────────────────────────────────────────
   const changes: ChangedAssumption[] = [];
-  if (Math.abs(basket - ECONOMICS.base_basket_size) > 0.01)
-    changes.push({ label: "Average basket size", old: ECONOMICS.base_basket_size, new: basket, unit: "EUR" });
-  if (Math.abs(margin - 0.35) > 0.001)
-    changes.push({ label: "Gross margin", old: 0.35, new: margin, unit: "%" });
-  if (staffing !== 1)
-    changes.push({ label: "Staffing level", old: 1, new: staffing, unit: "employees" });
-  if (days !== ECONOMICS.base_opening_days)
-    changes.push({ label: "Opening days per month", old: ECONOMICS.base_opening_days, new: days, unit: "days" });
+  if (Math.abs(basket - BASE_BASKET) > 0.01)
+    changes.push({ label: "Average basket size", old: BASE_BASKET, new: basket, unit: "EUR" });
+  if (Math.abs(margin - BASE_MARGIN) > 0.001)
+    changes.push({ label: "Gross margin", old: BASE_MARGIN, new: margin, unit: "%" });
+  if (staffing !== BASE_STAFF)
+    changes.push({ label: "Staffing level", old: BASE_STAFF, new: staffing, unit: "employees" });
+  if (days !== BASE_DAYS)
+    changes.push({ label: "Opening days per month", old: BASE_DAYS, new: days, unit: "days" });
   if (Math.abs(investment - 120000) > 1)
     changes.push({ label: "Initial investment budget", old: 120000, new: investment, unit: "EUR" });
   if (price_level !== "premium")
@@ -255,11 +286,13 @@ function deriveVerdict(profit_margin: number): string {
   return "Do not launch";
 }
 
-function deriveRiskLevel(profit_margin: number): string {
-  if (profit_margin > 0.15) return "Low";
-  if (profit_margin > 0.08) return "Medium-low";
-  if (profit_margin > 0.03) return "Medium";
-  if (profit_margin > 0) return "Medium-high";
+// Derives risk from break-even probability so it stays consistent with BEP.
+// Thresholds mirror the BREAK_EVEN_MAP in api.ts (0.80/0.60/0.40/0.20).
+function deriveRiskFromBep(bep: number): string {
+  if (bep >= 0.75) return "Low";
+  if (bep >= 0.55) return "Medium-low";
+  if (bep >= 0.38) return "Medium";
+  if (bep >= 0.22) return "Medium-high";
   return "High";
 }
 

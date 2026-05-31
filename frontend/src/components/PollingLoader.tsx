@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 import type { PipelineStep } from "@/lib/types";
 import { Search, Database, TrendingUp, FileText, CheckCircle2 } from "lucide-react";
+import { ExpandableFlappyBird } from "@/components/FlappyBird";
 
 interface PollingLoaderProps {
   step: PipelineStep;
@@ -53,9 +54,8 @@ export function PollingLoader({ step }: PollingLoaderProps) {
 
   return (
     <div className="flex flex-col items-center gap-10 py-16 select-none">
-      {/* Icon orb — single static glow, no ping rings */}
+      {/* Icon orb */}
       <div className="relative flex items-center justify-center">
-        {/* Soft ambient halo — CSS only, no animation */}
         <span
           className="absolute rounded-full opacity-20 blur-2xl"
           style={{
@@ -80,7 +80,7 @@ export function PollingLoader({ step }: PollingLoaderProps) {
         <p className="text-sm text-muted-foreground leading-relaxed">{current.copy}</p>
       </div>
 
-      {/* Progress track — promoted as the primary progress indicator */}
+      {/* Progress track */}
       <ol className="flex items-center gap-0" aria-label="Pipeline progress">
         {STEPS.filter((s) => s.id !== "done").map((s, idx) => {
           const stepIdx = STEP_ORDER.indexOf(s.id);
@@ -126,6 +126,9 @@ export function PollingLoader({ step }: PollingLoaderProps) {
           );
         })}
       </ol>
+
+      {/* Expandable mini-game — below the progress bar */}
+      <ExpandableFlappyBird />
     </div>
   );
 }

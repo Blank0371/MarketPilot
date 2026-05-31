@@ -36,21 +36,23 @@ export function ResultsDashboard({ report }: ResultsDashboardProps) {
         <FinancialProjection financials={report.financials} />
       </Section>
 
-      {/* 3. Forecast chart */}
-      <Section
-        title="Demand forecast"
-        description="Historical revenue signal and 6-month probabilistic forecast with confidence band."
-        badge={<BacktestBadge backtest={report.backtest} />}
-      >
-        <Card className="border-white/10 bg-card/60 shadow-[0_0_40px_-24px_var(--primary)] backdrop-blur">
-          <CardContent className="pt-6">
-            <ForecastChart
-              historical={report.graphs.historical_series}
-              forecast={report.graphs.demand_forecast}
-            />
-          </CardContent>
-        </Card>
-      </Section>
+      {/* 3. Forecast chart — only when backend provides graph data */}
+      {report.graphs && (
+        <Section
+          title="Demand forecast"
+          description="Historical revenue signal and 6-month probabilistic forecast with confidence band."
+          badge={report.backtest ? <BacktestBadge backtest={report.backtest} /> : undefined}
+        >
+          <Card className="border-white/10 bg-card/60 shadow-[0_0_40px_-24px_var(--primary)] backdrop-blur">
+            <CardContent className="pt-6">
+              <ForecastChart
+                historical={report.graphs.historical_series}
+                forecast={report.graphs.demand_forecast}
+              />
+            </CardContent>
+          </Card>
+        </Section>
+      )}
 
       {/* 4. What-if Sensitivity */}
       <WhatIfSensitivity
@@ -69,46 +71,52 @@ export function ResultsDashboard({ report }: ResultsDashboardProps) {
         <BeforeAfterComparison comparison={comparison} />
       )}
 
-      {/* 7. Drivers + Investment */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card className="border-white/10 bg-card/60 shadow-[0_0_40px_-24px_var(--primary)] backdrop-blur">
-          <CardHeader>
-            <CardTitle className="text-base">Driver importance</CardTitle>
-            <CardDescription>
-              Relative weight of each signal — and how importance shifts across the
-              forecast horizon.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <DriverImportanceChart drivers={report.drivers} />
-            {report.drivers.some((d) => d.explanation) && (
-              <ul className="space-y-2 border-t border-white/5 pt-3 text-xs text-muted-foreground">
-                {report.drivers.map(
-                  (d) =>
-                    d.explanation && (
-                      <li key={d.name}>
-                        <span className="font-medium text-foreground/80">{d.name}:</span>{" "}
-                        {d.explanation}
-                      </li>
-                    ),
+      {/* 7. Drivers + Investment — only when backend provides the data */}
+      {(report.drivers?.length || report.investment_breakdown?.length) ? (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          {report.drivers?.length ? (
+            <Card className="border-white/10 bg-card/60 shadow-[0_0_40px_-24px_var(--primary)] backdrop-blur">
+              <CardHeader>
+                <CardTitle className="text-base">Driver importance</CardTitle>
+                <CardDescription>
+                  Relative weight of each signal — and how importance shifts across the
+                  forecast horizon.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <DriverImportanceChart drivers={report.drivers} />
+                {report.drivers.some((d) => d.explanation) && (
+                  <ul className="space-y-2 border-t border-white/5 pt-3 text-xs text-muted-foreground">
+                    {report.drivers.map(
+                      (d) =>
+                        d.explanation && (
+                          <li key={d.name}>
+                            <span className="font-medium text-foreground/80">{d.name}:</span>{" "}
+                            {d.explanation}
+                          </li>
+                        ),
+                    )}
+                  </ul>
                 )}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          ) : null}
 
-        <Card className="border-white/10 bg-card/60 shadow-[0_0_40px_-24px_var(--accent)] backdrop-blur">
-          <CardHeader>
-            <CardTitle className="text-base">Investment breakdown</CardTitle>
-            <CardDescription>
-              Estimated allocation of the initial investment across categories.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <InvestmentBreakdown items={report.investment_breakdown} />
-          </CardContent>
-        </Card>
-      </div>
+          {report.investment_breakdown?.length ? (
+            <Card className="border-white/10 bg-card/60 shadow-[0_0_40px_-24px_var(--accent)] backdrop-blur">
+              <CardHeader>
+                <CardTitle className="text-base">Investment breakdown</CardTitle>
+                <CardDescription>
+                  Estimated allocation of the initial investment across categories.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <InvestmentBreakdown items={report.investment_breakdown} />
+              </CardContent>
+            </Card>
+          ) : null}
+        </div>
+      ) : null}
 
       {/* 8. Reasoning */}
       <Card className="border-white/10 bg-card/60 shadow-[0_0_40px_-24px_var(--primary)] backdrop-blur">

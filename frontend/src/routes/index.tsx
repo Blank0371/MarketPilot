@@ -17,11 +17,9 @@ import {
   trustFeatures,
 } from "@/lib/mockData";
 import { extract, confirm, getStatus, getResult } from "@/lib/mockApi";
-import { mockReport } from "@/lib/mockData";
 import {
   extractDescriptionsFromEndpoint,
   confirmDescriptionsWithEndpoint,
-  adaptConfirmResponseToReport,
 } from "@/lib/api";
 import type { DataMode } from "@/lib/api";
 import type { Report, PipelineStep } from "@/lib/types";
@@ -107,12 +105,14 @@ function Index() {
         setPhase("polling");
       } else {
         // Endpoint mode: backend confirm is synchronous — show loader while waiting.
+        // Clear any jobId leftover from a previous mock run so the polling loop
+        // does not fire and race against the endpoint response.
+        setJobId(null);
         setPipelineStep("forecasting");
         setPhase("polling");
         try {
-          const res = await confirmDescriptionsWithEndpoint(descriptions);
-          const adapted = adaptConfirmResponseToReport(res, mockReport);
-          setReport(adapted);
+          const report = await confirmDescriptionsWithEndpoint(descriptions);
+          setReport(report);
           setPhase("results");
         } catch (err) {
           setConfirmError(

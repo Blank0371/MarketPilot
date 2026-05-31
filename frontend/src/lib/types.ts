@@ -79,16 +79,16 @@ export interface Report {
     break_even_probability: number;
     payback_period_months: number;
   };
-  graphs: GraphsData;
-  drivers: Driver[];
-  investment_breakdown: InvestmentItem[];
+  graphs?: GraphsData;
+  drivers?: Driver[];
+  investment_breakdown?: InvestmentItem[];
   reason: {
     main_reason: string;
     positive_factors: string[];
     negative_factors: string[];
     recommended_actions: string[];
   };
-  backtest: Backtest;
+  backtest?: Backtest | null;
 }
 
 // ─── What-if overrides ────────────────────────────────────────────────────────
