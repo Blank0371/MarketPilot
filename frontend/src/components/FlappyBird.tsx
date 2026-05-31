@@ -3,24 +3,40 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const W = 440;
-const H = 210;
-const BIRD_X = 80;
+const W = 580;
+const H = 300;
+const BIRD_X = 90;
 const PW = 52;           // plane sprite width on canvas
 const PH = 42;           // plane sprite height on canvas
-const GRAVITY = 0.36;
-const JUMP = -6.4;
-const PIPE_W = 50;
-const PIPE_GAP = 90;
-const PIPE_SPEED = 2.2;
-const PIPE_SPAWN_FRAMES = 115;
+const GRAVITY = 0.22;
+const JUMP = -5.0;
+const PIPE_W = 54;
+const PIPE_GAP = 145;
+const PIPE_SPEED = 1.6;
+const PIPE_SPAWN_FRAMES = 155;
 
-// ─── Module-level image preload (Vite serves /public at /) ───────────────────
+// ─── Lazy image loader (avoids SSR crash — Image is browser-only) ────────────
 
-const IMG_BG     = Object.assign(new Image(), { src: "/loading-game/background.png" });
-const IMG_PLANE  = Object.assign(new Image(), { src: "/loading-game/plane.png" });
-const IMG_GREEN  = Object.assign(new Image(), { src: "/loading-game/candle_green.png" });
-const IMG_RED    = Object.assign(new Image(), { src: "/loading-game/candle_red.png" });
+interface GameImages {
+  bg: HTMLImageElement;
+  plane: HTMLImageElement;
+  green: HTMLImageElement;
+  red: HTMLImageElement;
+}
+
+let _imgs: GameImages | null = null;
+
+function getImgs(): GameImages {
+  if (!_imgs) {
+    _imgs = {
+      bg:    Object.assign(new Image(), { src: "/loading-game/background.png" }),
+      plane: Object.assign(new Image(), { src: "/loading-game/plane.png" }),
+      green: Object.assign(new Image(), { src: "/loading-game/candle_green.png" }),
+      red:   Object.assign(new Image(), { src: "/loading-game/candle_red.png" }),
+    };
+  }
+  return _imgs;
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -49,24 +65,26 @@ function makeState(): GameState {
 }
 
 function spawnPipe(): Pipe {
-  const topH = 30 + Math.random() * (H - PIPE_GAP - 60);
+  // extra vertical margin so the gap never spawns too close to edges
+  const topH = 45 + Math.random() * (H - PIPE_GAP - 90);
   return { x: W + PIPE_W, topH, scored: false };
 }
 
 // ─── Draw helpers ─────────────────────────────────────────────────────────────
 
 function drawBackground(ctx: CanvasRenderingContext2D, bgOffset: number) {
-  if (!IMG_BG.complete || IMG_BG.naturalWidth === 0) {
+  const img = getImgs().bg;
+  if (!img.complete || img.naturalWidth === 0) {
     ctx.fillStyle = "#0a1628";
     ctx.fillRect(0, 0, W, H);
     return;
   }
-  const scale = H / IMG_BG.naturalHeight;
-  const sw = IMG_BG.naturalWidth * scale;
+  const scale = H / img.naturalHeight;
+  const sw = img.naturalWidth * scale;
   // Tile from slightly before canvas left so no blank strip appears
   const startX = ((-bgOffset * scale) % sw) - sw;
   for (let x = startX; x < W; x += sw) {
-    ctx.drawImage(IMG_BG, x, 0, sw, H);
+    ctx.drawImage(img, x, 0, sw, H);
   }
 }
 
@@ -74,31 +92,33 @@ function drawPipe(ctx: CanvasRenderingContext2D, pipe: Pipe) {
   const { x, topH } = pipe;
   const botY = topH + PIPE_GAP;
   const botH = H - botY;
+  const { red, green } = getImgs();
 
   // ── Top pipe: red candle flipped vertically ──
-  if (IMG_RED.complete && topH > 0) {
+  if (red.complete && topH > 0) {
     ctx.save();
     ctx.translate(x + PIPE_W / 2, topH);
     ctx.scale(1, -1);
-    ctx.drawImage(IMG_RED, -PIPE_W / 2, 0, PIPE_W, topH);
+    ctx.drawImage(red, -PIPE_W / 2, 0, PIPE_W, topH);
     ctx.restore();
   }
 
   // ── Bottom pipe: green candle normal ──
-  if (IMG_GREEN.complete && botH > 0) {
-    ctx.drawImage(IMG_GREEN, x, botY, PIPE_W, botH);
+  if (green.complete && botH > 0) {
+    ctx.drawImage(green, x, botY, PIPE_W, botH);
   }
 }
 
 function drawPlane(ctx: CanvasRenderingContext2D, y: number, velY: number, dead: boolean) {
-  if (!IMG_PLANE.complete) return;
+  const img = getImgs().plane;
+  if (!img.complete) return;
   ctx.save();
   ctx.translate(BIRD_X, y);
   // Tilt up on jump, down on fall; clamp so it doesn't over-rotate
   const angle = dead ? 0.6 : Math.max(-0.4, Math.min(0.55, velY * 0.065));
   ctx.rotate(angle);
   if (dead) ctx.globalAlpha = 0.7;
-  ctx.drawImage(IMG_PLANE, -PW / 2, -PH / 2, PW, PH);
+  ctx.drawImage(img, -PW / 2, -PH / 2, PW, PH);
   ctx.restore();
 }
 
@@ -139,7 +159,7 @@ export function FlappyBird() {
       const s = stateRef.current;
 
       // Background
-      if (s.phase === "running") s.bgOffset += 1.3;
+      if (s.phase === "running") s.bgOffset += 0.9;
       drawBackground(ctx, s.bgOffset);
 
       // Physics + pipe logic
