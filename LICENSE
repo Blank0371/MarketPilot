@@ -1,67 +1,4 @@
-Business Source License 1.1
-
-License text copyright (c) 2020 MariaDB Corporation Ab, All Rights Reserved.
-"Business Source License" is a trademark of MariaDB Corporation Ab.
-
------------------------------------------------------------------------------
-
-Parameters
-
-Licensor:             Market Pilot - Serebro
-Licensed Work:        MarketPilot
-                      The Licensed Work is (c) 2025 Market Pilot - Serebro
-Additional Use Grant: None
-Change Date:          2031-01-01
-Change License:       MIT License
-
------------------------------------------------------------------------------
-
-Terms
-
-The Licensor hereby grants you the right to copy and redistribute the
-Licensed Work in source or object form, for non-production purposes only,
-provided that you do not modify the Licensed Work.
-
-You may not use the Licensed Work for production purposes, offer it as a
-service to third parties, sublicense it, or create derivative works from it
-without a separate written agreement from the Licensor.
-
-Effective on the Change Date, or the sixth anniversary of the first publicly
-available distribution of a specific version of the Licensed Work under this
-License, whichever comes first, the Licensor hereby grants you rights under
-the terms of the MIT License (reproduced below), and the rights granted in
-the paragraph above terminate.
-
-If your use of the Licensed Work does not comply with the requirements
-currently in effect as described in this License, you must purchase a
-commercial license from the Licensor, its affiliated entities, or authorized
-resellers, or you must refrain from using the Licensed Work.
-
-All copies of the Licensed Work, and any redistribution thereof, are subject
-to this License. This License applies separately for each version of the
-Licensed Work, and the Change Date may vary for each version of the Licensed
-Work released by the Licensor.
-
-You must conspicuously display this License on each original copy of the
-Licensed Work. If you receive the Licensed Work from a third party, the terms
-and conditions set forth in this License apply to your use of that work.
-
-Any use of the Licensed Work in violation of this License will automatically
-terminate your rights under this License for the current and all other
-versions of the Licensed Work.
-
-This License does not grant you any right in any trademark or logo of
-Licensor or its affiliates.
-
-TO THE EXTENT PERMITTED BY APPLICABLE LAW, THE LICENSED WORK IS PROVIDED ON
-AN "AS IS" BASIS. LICENSOR HEREBY DISCLAIMS ALL WARRANTIES AND CONDITIONS,
-EXPRESS OR IMPLIED, INCLUDING (WITHOUT LIMITATION) WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, NON-INFRINGEMENT, AND
-TITLE.
-
------------------------------------------------------------------------------
-
-MIT License (effective from 2031-01-01)
+MIT License
 
 Copyright (c) 2025 Market Pilot - Serebro
 
@@ -72,8 +9,8 @@ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
