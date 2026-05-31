@@ -6,14 +6,15 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 const W = 580;
 const H = 300;
 const BIRD_X = 90;
-const PW = 52;           // plane sprite width on canvas
-const PH = 42;           // plane sprite height on canvas
-const GRAVITY = 0.22;
-const JUMP = -5.0;
+const PW = 52;              // plane sprite width on canvas
+const PH = 42;              // plane sprite height on canvas
+const GRAVITY = 0.09;       // very gentle — floaty feel
+const JUMP = -3.6;          // soft hop, not a snap
+const MAX_FALL_SPEED = 3.2; // cap so the plane never plummets uncontrollably
 const PIPE_W = 54;
-const PIPE_GAP = 145;
-const PIPE_SPEED = 1.6;
-const PIPE_SPAWN_FRAMES = 155;
+const PIPE_GAP = 155;       // wide opening — relaxed difficulty
+const PIPE_SPEED = 1.45;
+const PIPE_SPAWN_FRAMES = 165;
 
 // ─── Lazy image loader (avoids SSR crash — Image is browser-only) ────────────
 
@@ -165,6 +166,7 @@ export function FlappyBird() {
       // Physics + pipe logic
       if (s.phase === "running") {
         s.velY += GRAVITY;
+        s.velY = Math.min(s.velY, MAX_FALL_SPEED); // prevent uncontrolled plummet
         s.birdY += s.velY;
 
         // Spawn
@@ -186,14 +188,17 @@ export function FlappyBird() {
         }
         s.pipes = s.pipes.filter((p) => p.x + PIPE_W > 0);
 
-        // Collision (shrink hitbox to ~70% of sprite for fairness)
-        const hw = PW * 0.35;
-        const hh = PH * 0.35;
+        // Tiny hitbox (~36% of sprite area) — feels fair for a relaxed game.
+        // hw/hh are half-extents from the sprite center.
+        const hw = PW * 0.18;  // ≈9px — only the fuselage, not the wings
+        const hh = PH * 0.20;  // ≈8px — only the body core
         const hitBound = s.birdY - hh < 0 || s.birdY + hh > H;
         const hitPipe = s.pipes.some((p) => {
-          const inX = BIRD_X + hw > p.x + 4 && BIRD_X - hw < p.x + PIPE_W - 4;
+          // 7px inset on each pipe edge so wing-tips don't collide with thin air
+          const inX = BIRD_X + hw > p.x + 7 && BIRD_X - hw < p.x + PIPE_W - 7;
+          // 6px buffer at top/bottom of the gap opening — grazing the edge doesn't kill
           const inGap =
-            s.birdY - hh > p.topH && s.birdY + hh < p.topH + PIPE_GAP;
+            s.birdY - hh > p.topH + 6 && s.birdY + hh < p.topH + PIPE_GAP - 6;
           return inX && !inGap;
         });
 
