@@ -1,4 +1,5 @@
-import { mockDescriptions, mockReport, ECONOMICS } from "./mockData";
+import { ECONOMICS } from "./mockData";
+import { pickMockCaseId, getMockCase, DEFAULT_MOCK_CASE_ID } from "./mockCases";
 import type {
   DescriptionsPayload,
   ConfirmResponse,
@@ -17,6 +18,11 @@ const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 const jobRegistry = new Map<string, number>();
 
+// Which show-case the demo is currently running. `extract` selects it from the
+// idea text; `getResult` returns that case's report. Module-level state is fine
+// for the sequential single-user demo flow (idea → confirm → results).
+let selectedCaseId = DEFAULT_MOCK_CASE_ID;
+
 // ─── Extract ─────────────────────────────────────────────────────────────────
 
 /**
@@ -26,8 +32,9 @@ const jobRegistry = new Map<string, number>();
  */
 export async function extract(userInput: string): Promise<DescriptionsPayload> {
   await delay(1100);
-  void userInput;
-  return { descriptions: [...mockDescriptions] };
+  // Pick the show-case from the idea text and remember it for getResult.
+  selectedCaseId = pickMockCaseId(userInput);
+  return { descriptions: [...getMockCase(selectedCaseId).descriptions] };
 }
 
 // ─── Confirm ──────────────────────────────────────────────────────────────────
@@ -79,7 +86,9 @@ export async function getStatus(job_id: string): Promise<JobStatus> {
 export async function getResult(job_id: string): Promise<Report> {
   await delay(200);
   void job_id;
-  return structuredClone(mockReport);
+  // Return the show-case selected by `extract` (deep-cloned so downstream
+  // what-if / add-factor never mutate the shared dataset).
+  return structuredClone(getMockCase(selectedCaseId).report);
 }
 
 // ─── What-if recalculation ────────────────────────────────────────────────────
@@ -112,18 +121,18 @@ export async function mockRecalculateWithOverrides(
   await delay(120); // simulate slight async
 
   // ── Base values (defaults) ─────────────────────────────────────────────────
-  const BASE_BASKET  = ECONOMICS.base_basket_size;   // 42 EUR
-  const BASE_DAYS    = ECONOMICS.base_opening_days;  // 22 days
-  const BASE_MARGIN  = 0.35;
-  const BASE_STAFF   = 1;                            // employees
+  const BASE_BASKET = ECONOMICS.base_basket_size; // 42 EUR
+  const BASE_DAYS = ECONOMICS.base_opening_days; // 22 days
+  const BASE_MARGIN = 0.35;
+  const BASE_STAFF = 1; // employees
 
   // ── Read overrides ────────────────────────────────────────────────────────
-  const basket      = (overrides["average_basket_size"]      as number) ?? BASE_BASKET;
-  const margin      = (overrides["gross_margin"]             as number) ?? BASE_MARGIN;
-  const staffing    = (overrides["staffing_level"]           as number) ?? BASE_STAFF;
-  const days        = (overrides["opening_days_per_month"]   as number) ?? BASE_DAYS;
-  const investment  = (overrides["initial_investment_budget"] as number) ?? 120000;
-  const price_level = (overrides["product_price_level"]      as string) ?? "premium";
+  const basket = (overrides["average_basket_size"] as number) ?? BASE_BASKET;
+  const margin = (overrides["gross_margin"] as number) ?? BASE_MARGIN;
+  const staffing = (overrides["staffing_level"] as number) ?? BASE_STAFF;
+  const days = (overrides["opening_days_per_month"] as number) ?? BASE_DAYS;
+  const investment = (overrides["initial_investment_budget"] as number) ?? 120000;
+  const price_level = (overrides["product_price_level"] as string) ?? "premium";
 
   const demand_mult = DEMAND_MULT[price_level] ?? 1.0;
 
@@ -140,16 +149,16 @@ export async function mockRecalculateWithOverrides(
   //   This guarantees: at base values → new_costs == baseReport.financials.expected_monthly_costs
   // ─────────────────────────────────────────────────────────────────────────
   const base_revenue = baseReport.financials.expected_monthly_revenue;
-  const base_costs   = baseReport.financials.expected_monthly_costs;
+  const base_costs = baseReport.financials.expected_monthly_costs;
 
   const revenue_scale = (basket / BASE_BASKET) * (days / BASE_DAYS) * demand_mult;
-  const new_revenue   = Math.round(base_revenue * revenue_scale);
+  const new_revenue = Math.round(base_revenue * revenue_scale);
 
-  const cogs_delta  = new_revenue * (1 - margin) - base_revenue * (1 - BASE_MARGIN);
+  const cogs_delta = new_revenue * (1 - margin) - base_revenue * (1 - BASE_MARGIN);
   const staff_delta = (staffing - BASE_STAFF) * ECONOMICS.staff_cost_per_employee;
-  const new_costs   = Math.round(base_costs + cogs_delta + staff_delta);
+  const new_costs = Math.round(base_costs + cogs_delta + staff_delta);
 
-  const new_profit   = new_revenue - new_costs;
+  const new_profit = new_revenue - new_costs;
   const profit_margin = new_revenue > 0 ? new_profit / new_revenue : -1;
 
   // ── Verdict, BEP, Risk — all anchored to baseReport ──────────────────────
@@ -160,15 +169,15 @@ export async function mockRecalculateWithOverrides(
   //   Risk: derived from new_bep so the two stay consistent with each other.
   //     At base values → new_bep == base_bep → same risk band as baseReport.
   // ─────────────────────────────────────────────────────────────────────────
-  const base_profit  = baseReport.financials.expected_monthly_profit;
-  const base_bep     = baseReport.financials.break_even_probability;
-  const base_margin  = base_revenue > 0 ? base_profit / base_revenue : 0;
+  const base_profit = baseReport.financials.expected_monthly_profit;
+  const base_bep = baseReport.financials.break_even_probability;
+  const base_margin = base_revenue > 0 ? base_profit / base_revenue : 0;
 
   const margin_delta = profit_margin - base_margin;
-  const new_bep      = Math.max(0.05, Math.min(0.97, base_bep + margin_delta * 2.5));
-  const new_risk     = deriveRiskFromBep(new_bep);
+  const new_bep = Math.max(0.05, Math.min(0.97, base_bep + margin_delta * 2.5));
+  const new_risk = deriveRiskFromBep(new_bep);
   const new_decision = deriveVerdict(profit_margin);
-  const payback      = new_profit > 0 ? Math.round(investment / new_profit) : 999;
+  const payback = new_profit > 0 ? Math.round(investment / new_profit) : 999;
   void payback;
 
   // ── Changed assumptions ───────────────────────────────────────────────────
@@ -234,17 +243,17 @@ export async function mockAddMarketFactor(
     baseReport.financials.expected_monthly_revenue * (1 + impact.revenue_delta_pct),
   );
   const new_profit = Math.round(
-    baseReport.financials.expected_monthly_profit
-    - impact.cost_increase_eur
-    + (new_revenue - baseReport.financials.expected_monthly_revenue) * 0.35,
+    baseReport.financials.expected_monthly_profit -
+      impact.cost_increase_eur +
+      (new_revenue - baseReport.financials.expected_monthly_revenue) * 0.35,
   );
   const profit_margin = new_revenue > 0 ? new_profit / new_revenue : -1;
   const new_decision = deriveVerdict(profit_margin);
-  const new_risk = deriveRiskLevel(profit_margin);
   const new_bep = Math.max(
     0.05,
     Math.min(0.97, baseReport.financials.break_even_probability - impact.cost_increase_eur / 10000),
   );
+  const new_risk = deriveRiskFromBep(new_bep); // keep risk consistent with break-even
 
   const baseline: ComparisonSummary = {
     decision: baseReport.decision.label,
@@ -310,8 +319,28 @@ function buildWhatIfSummary(
 
 function extractKeywords(description: string): string[] {
   const STOP = new Set([
-    "a","an","the","for","in","of","at","to","by","and","or","with",
-    "from","that","this","on","as","is","are","was","were","per",
+    "a",
+    "an",
+    "the",
+    "for",
+    "in",
+    "of",
+    "at",
+    "to",
+    "by",
+    "and",
+    "or",
+    "with",
+    "from",
+    "that",
+    "this",
+    "on",
+    "as",
+    "is",
+    "are",
+    "was",
+    "were",
+    "per",
   ]);
   return [
     ...new Set(
