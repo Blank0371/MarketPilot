@@ -1,540 +1,283 @@
-# ZeroOneHack_01
-Project for Zero One Hack, Vienna 05/2025
+# MarketPilot
 
-# Forecast-Driven Business Launch Agent
+> **Navigate uncertainty before you launch.**
 
-## 1. Kurzbeschreibung
+A forecasting-driven **decision agent** for future business owners and the investors who back them. Type a business idea in plain language and MarketPilot turns a probabilistic market forecast into a transparent **go / no-go** recommendation — with the numbers, drivers, and reasoning all on the table.
 
-Unsere Idee ist ein **Forecast-Driven Business Launch Agent**.
+Built for **Zero One Hack, Vienna · May 2025** — Track 3: *Forecasting AI* (Challenge owner: **Sybilion**).
 
-Die Anwendung hilft zukünftigen Geschäftsinhabern dabei, eine Geschäftsidee an einem konkreten Standort datenbasiert zu bewerten. Nutzer können über ein detailliertes UI ihre Idee beschreiben, zum Beispiel:
-
-> “Ich möchte einen Premium-Weinshop im 1. Bezirk in Wien eröffnen.”
-
-Das System analysiert anschließend, ob diese Idee wirtschaftlich sinnvoll ist. Dafür werden probabilistische Forecasts, lokale Marktannahmen, Mockdaten, Kostenstrukturen und Business-Logik kombiniert.
-
-Am Ende gibt das System eine klare Empfehlung:
-
-* **Launch**
-* **Adapt concept**
-* **Delay / change location**
-* **Do not launch**
-
-Wichtig: Die Sybilion API liefert nicht direkt die finale Geschäftsentscheidung. Sie liefert Forecasts, Unsicherheiten, Treiber und Backtest-Daten. Unsere eigene Anwendung baut darauf die Entscheidungsschicht.
+**Stack:** Python · FastAPI · TanStack Start · React · TypeScript · Sybilion Forecasting API · Featherless LLM
 
 ---
 
-## 2. Problem
+## What it does
 
-Viele Menschen haben Geschäftsideen, wissen aber nicht, ob diese an einem bestimmten Standort wirtschaftlich sinnvoll sind.
+Founders have ideas; they rarely have a defensible answer to *"will this actually work, here, right now?"* Investors face the mirror image: a pitch deck and a gut feeling. MarketPilot sits between the two.
 
-Typische Fragen sind:
+You describe an idea in free text — for example:
 
-* Gibt es genug Nachfrage?
-* Ist der Standort passend?
-* Sind die Fixkosten zu hoch?
-* Wie stark ist die Konkurrenz?
-* Wie wirkt sich Saisonalität aus?
-* Was passiert, wenn Miete oder Personalkosten steigen?
-* Welche externen Faktoren beeinflussen die Erfolgschance?
+> "I want to open an ice cream shop in Vienna's 1st district."
 
-Aktuelle Tools liefern oft nur statische Analysen oder grobe Marktinformationen. Unser Agent soll dagegen dynamisch, probabilistisch und entscheidungsorientiert arbeiten.
+MarketPilot then:
 
----
+1. extracts the **quantifiable factors** behind the idea (rent, foot traffic, seasonality, margin, tourism dependency, …) and lets you edit them,
+2. pulls a **historical monthly time series** for the relevant market signal,
+3. runs a **probabilistic forecast** through the Sybilion API (downside / base / upside, with confidence bands and driver importance),
+4. computes the economics — expected revenue, costs, investment, break-even probability, payback — and returns a clear verdict:
 
-## 3. Lösung
+| Verdict | Meaning |
+|---|---|
+| **Launch** | Economically attractive under current assumptions. |
+| **Adapt concept** | Real potential, but the current concept is too risky — adjust it. |
+| **Delay / change location** | Could work, but not under current conditions or at this location. |
+| **Do not launch** | Not attractive under current assumptions. |
 
-Wir bauen eine Webanwendung, in der Nutzer ihre Geschäftsidee strukturiert eingeben können.
-
-Beispiel:
-
-```text
-Business type: Premium wine shop
-Location: Vienna 1st district
-Target customers: tourists, locals, restaurants, corporate gifts
-Business model: retail + tastings + online delivery
-Initial investment: €120,000
-Monthly rent: €8,000
-Staff costs: €12,000
-Average basket size: €42
-Gross margin: 35%
-Forecast horizon: 6 months
-Competition level: medium-high
-Foot traffic: high
-Tourism dependency: high
-```
-
-Die Anwendung kombiniert diese Angaben mit:
-
-* Forecasts aus der Sybilion API
-* lokalen Mockdaten
-* Kostenannahmen
-* Nachfrageannahmen
-* Wettbewerbsdruck
-* Standortfaktoren
-* Risikoregeln
-* Break-even-Analyse
-* Szenario-Simulation
+The point is not just the label. It's the **visible reasoning** behind it — and the ability to change an assumption live (rent goes up, basket size goes up) and watch the recommendation move.
 
 ---
 
-## 4. Beispiel-Use-Case
+## Who it's for
 
-### Szenario
+MarketPilot serves two sides of the same decision. The numbers and reasoning are identical; what differs is the question being asked.
 
-Ein Gründer möchte einen Premium-Weinshop im 1. Bezirk in Wien eröffnen.
+**Aspiring business owners** — to pressure-test an idea before committing capital: is the demand there, is the location right, where does it break even, and what would need to change to make it viable.
 
-Der Standort hat:
+**Investors (VCs, angels, family offices)** — for **investment risk evaluation**: an independent second opinion on a pitched venture, grounding gut feeling in a probabilistic demand forecast, explicit downside/upside scenarios, and a transparent break-even probability rather than a founder's projections alone.
 
-* hohe Touristenfrequenz
-* hohe Kaufkraft
-* hohe Mieten
-* starke Konkurrenz
-* Potenzial für Premium-Produkte
-* Potenzial für Tastings, Firmenkunden und Geschenkkörbe
+**Banks and lenders** — for **loan and credit evaluation**: assessing the viability of a small-business or location-based venture before extending financing, with a traceable, reproducible verdict and visible driver analysis that can be attached to a credit file.
 
-### Forecast-Signale
-
-Die Sybilion API kann relevante Marktindikatoren prognostizieren, zum Beispiel:
-
-* Tourismusnachfrage
-* Premium-Retail-Spending
-* Konsumverhalten
-* Kostendruck
-* saisonale Nachfrage
-* allgemeine Retail-Entwicklung
-
-Die API liefert dabei nicht nur einen einzelnen Wert, sondern probabilistische Ergebnisse:
-
-* Downside-Szenario
-* Base-Szenario
-* Upside-Szenario
-* Confidence Bands
-* wichtige externe Treiber
-* Backtest-Metriken
+In every case the value is the same: a forecast plus a driver list does not, by itself, change a decision. MarketPilot turns probabilistic market signals into a defensible **go / no-go** call — with the reasoning legible to a non-expert and reproducible enough to stand up to scrutiny.
 
 ---
 
-## 5. Rolle der Sybilion API
+## How it works
 
-Die Sybilion API ist der Forecasting-Layer.
-
-Sie nimmt eine monatliche Zeitreihe und Kontext-Keywords entgegen und liefert:
-
-* probabilistische Monats-Forecasts
-* Forecast-Bands, z. B. p10, p50, p90
-* externe Treiber mit Importance Scores
-* Backtest Accuracy Metrics
-
-Beispielhafte Treiber:
-
-```text
-Tourism demand
-Premium retail spending
-Rent pressure
-Competition density
-Seasonality
-Consumer spending
+```
+User types a free-text business idea
+        │
+        ▼
+Translation agent (LLM)   →  extracts standardized DESCRIPTIONS of the
+        │                    quantifiable factors (rent, footfall, seasonality…)
+        ▼
+        (user edits / confirms the descriptions in the UI)
+        │
+        ▼
+Translation agent (LLM)   →  derives 3–6 forecasting KEYWORDS
+        │
+        ▼
+Data-Engineer agent       →  returns a historical monthly time series + metadata
+        │
+        ▼
+Sybilion API              →  probabilistic forecast: p10 / p50 / p90,
+        │                    confidence bands, driver importance, backtest metrics
+        ▼
+Decision engine           →  expected revenue, costs, investment, break-even
+        │                    probability, risk-adjusted profit → verdict + reason
+        ▼
+Frontend dashboard        →  forecast chart · drivers · financials · verdict
+        │
+        ▼
+What-if controls          →  change an assumption, recompute, compare before/after
 ```
 
-Unsere Anwendung nutzt diese API-Ergebnisse, um daraus konkrete Entscheidungen abzuleiten.
+The standardized factors the agent reasons over are **rent, staff costs, location foot traffic, average basket price, margin, seasonality, and tourism dependency** — each one rephrased to fit the specific idea.
 
 ---
 
-## 6. Was unser eigener Agent macht
+## Tech stack
 
-Unser Agent ist die Entscheidungsschicht über der Forecasting API.
+**Frontend** (`frontend/`, port `5173`)
+- React 19 + TypeScript on **TanStack Start** (file-based routing, Vite)
+- Tailwind CSS v4 + **shadcn/ui** (Radix primitives)
+- Recharts for forecast/driver visualizations, Framer Motion for transitions
+- Ships with an offline mock mode so the dashboard runs without a backend
 
-Er berechnet unter anderem:
-
-* erwarteten Umsatz
-* erwarteten Rohertrag
-* operative Kosten
-* erwarteten Monatsgewinn
-* Downside-Risiko
-* Upside-Potenzial
-* Break-even-Wahrscheinlichkeit
-* Risikoadjustierten Gewinn
-* Standort-Fit
-* Entscheidungsempfehlung
-
-Beispielhafte Logik:
-
-```text
-base_demand = forecast_p50 × foot_traffic_index × location_multiplier
-
-monthly_revenue = base_demand × average_basket_size
-
-gross_profit = monthly_revenue × gross_margin
-
-operating_profit = gross_profit - rent - staff_costs - other_fixed_costs
-
-risk_adjusted_profit =
-    operating_profit
-    - uncertainty_penalty
-    - competition_penalty
-    - rent_pressure_penalty
-```
-
-Die finale Entscheidung basiert also nicht auf einem LLM, sondern auf nachvollziehbarer Business-Logik.
+**Backend** (`backend/`, ports `8002` + `8003`)
+- Python + **FastAPI** + Pydantic, served by Uvicorn
+- **Translation agent** (`:8003`) — idea → descriptions → keywords; orchestrates the pipeline
+- **Data-Engineer agent** (`:8002`) — historical monthly time-series provider
+- LLM calls via **Featherless** (OpenAI-compatible; Llama 3.1 8B by default), with a deterministic mock fallback when no key is set
+- Forecasting via the **Sybilion** Python SDK
 
 ---
 
-## 7. Entscheidungsempfehlungen
+## Project structure
 
-Der Agent gibt eine von vier Empfehlungen aus:
-
-### 1. Launch
-
-Die Geschäftsidee ist unter den aktuellen Annahmen wirtschaftlich attraktiv.
-
-Beispiel:
-
-```text
-Break-even probability: 82%
-Risk-adjusted profit: positive
-Recommendation: Launch
 ```
-
-### 2. Adapt concept
-
-Die Idee hat Potenzial, aber das aktuelle Konzept ist zu riskant oder nicht optimal.
-
-Beispiel:
-
-```text
-Recommendation: Adapt concept
-
-Reason:
-A pure retail wine shop is risky due to high rent and competition.
-Adding tastings, B2B restaurant supply, corporate gifts and online delivery improves viability.
-```
-
-### 3. Delay / change location
-
-Die Idee könnte funktionieren, aber nicht unter den aktuellen Marktbedingungen oder am aktuellen Standort.
-
-Beispiel:
-
-```text
-Recommendation: Delay or change location
-
-Reason:
-Demand is currently uncertain and cost pressure is too high.
-```
-
-### 4. Do not launch
-
-Die Idee ist unter den aktuellen Annahmen wirtschaftlich nicht attraktiv.
-
-Beispiel:
-
-```text
-Recommendation: Do not launch
-
-Reason:
-The downside scenario becomes unprofitable and the break-even probability is too low.
+ZeroOneHack_01/
+├── backend/
+│   ├── translation_agent.py    # idea → descriptions → keywords; pipeline orchestrator (:8003)
+│   ├── data_engineer.py        # historical monthly time-series endpoint (:8002)
+│   ├── report_agent.py         # decision-report producer (decision engine)
+│   ├── sybilion_client.py      # Sybilion forecast wrapper + synthetic fallback
+│   ├── requirements.txt
+│   └── MODEL.md                # decision-model specification
+├── frontend/                   # TanStack Start + React + TS dashboard (:5173)
+│   └── src/lib/                # api.ts, mockApi.ts, mockData.ts, types.ts
+├── data-engineer-agent/        # standalone real data-engineer service (roadmap)
+├── mock/                       # committed mock series, forecast, drivers, backtest (fallbacks)
+├── tests/                      # pytest suite for the backend agents
+├── start.sh                    # launches both backend agents + the frontend
+├── .env-example                # copy to .env for local secrets
+├── ARCHITECTURE.md             # system wiring (canonical)
+├── FLOW_AND_AGENTS.md          # product flow + agent contracts
+├── FOR_DEVELOPERS.md           # detailed setup & runbook
+└── README.md                   # this file
 ```
 
 ---
 
-## 8. Warum die Idee zum Forecasting AI Track passt
+## Getting started
 
-Der Track verlangt nicht, dass wir ein eigenes Forecasting-Modell trainieren. Die Sybilion API liefert den Forecast.
+### Prerequisites
+- Python 3.11+
+- Node.js 18+ (npm; **bun** also works — the repo includes a `bun.lock`)
 
-Unsere Aufgabe ist es, darauf einen **Decision Agent** zu bauen.
+### 1. Clone and configure
 
-| Track-Anforderung      | Unsere Umsetzung                                           |
-| ---------------------- | ---------------------------------------------------------- |
-| Probabilistic forecast | Forecasts mit p10, p50, p90                                |
-| Driver importance      | Anzeige wichtiger Treiber wie Tourismus, Miete, Konkurrenz |
-| Decision change        | Forecast beeinflusst Launch/No-Launch-Entscheidung         |
-| Visible reasoning      | Break-even, Treiber, Kosten und Risiken werden sichtbar    |
-| Adaptive behavior      | Annahmen können live verändert werden                      |
-| Substantive logic      | Eigene Decision Engine, keine reine LLM-Zusammenfassung    |
-| Live demo              | Szenario kann auf der Bühne verändert werden               |
-
----
-
-## 9. Live-Demo-Idee
-
-### Schritt 1: Default-Szenario laden
-
-```text
-Business: Premium wine shop
-Location: Vienna 1st district
-Rent: €8,000/month
-Staff costs: €12,000/month
-Average basket size: €42
-Gross margin: 35%
+```bash
+git clone https://github.com/stnleey/ZeroOneHack_01.git
+cd ZeroOneHack_01
+cp .env-example .env   # fill in keys if you have them — optional, see below
 ```
 
-### Schritt 2: Analyse starten
+### 2. Install backend dependencies
 
-Das System zeigt:
+`start.sh` expects the virtualenv at `env/` (it falls back to `.venv/`):
 
-* Forecast mit Confidence Bands
-* Driver Importance Chart
-* Break-even-Wahrscheinlichkeit
-* erwarteten Monatsgewinn
-* finale Empfehlung
-
-### Schritt 3: Erste Empfehlung
-
-Beispiel:
-
-```text
-Recommendation: Adapt concept
-
-Reason:
-The location has strong demand potential due to tourism and premium retail spending.
-However, high rent and competition make a pure retail concept risky.
-The agent recommends adding tastings, B2B sales and corporate gift packages.
+```bash
+python3 -m venv env
+source env/bin/activate
+pip install -r backend/requirements.txt
 ```
 
-### Schritt 4: Live-Annahme ändern
+### 3. Install frontend dependencies
 
-Die Jury oder das Team ändert eine Annahme:
-
-```text
-Monthly rent increases from €8,000 to €13,000.
+```bash
+cd frontend
+npm install        # or: bun install
+cd ..
 ```
 
-### Schritt 5: Agent reagiert
+### 4. Run everything
 
-Das System berechnet neu:
-
-```text
-Break-even probability drops from 67% to 48%.
-
-Recommendation changes from:
-Adapt concept
-
-to:
-Do not launch / change location
+```bash
+./start.sh
 ```
 
-### Schritt 6: Konzept verbessern
+This launches the Data-Engineer agent (`:8002`), the Translation agent (`:8003`), and the frontend dev server (`:5173`), and stops them all on `Ctrl+C`. Then open:
 
-Dann wird das Geschäftsmodell angepasst:
-
-```text
-Average basket size increases from €42 to €58.
-Additional tasting revenue is added.
+```
+http://localhost:5173
 ```
 
-### Schritt 7: Empfehlung verbessert sich
+Ports are overridable:
 
-```text
-Break-even probability increases again.
-Recommendation changes to:
-Adapt concept / Launch conditionally
+```bash
+DATA_ENGINEER_PORT=8012 TRANSLATION_PORT=8013 FRONTEND_PORT=5174 ./start.sh
 ```
 
-Dadurch zeigen wir genau das, was der Track sehen will:
+### Running services individually
 
-* Forecast verändert die Entscheidung
-* Reasoning ist sichtbar
-* Agent passt sich an neue Annahmen an
+```bash
+# backend agents (separate terminals)
+source env/bin/activate
+uvicorn backend.data_engineer:app --reload --port 8002
+uvicorn backend.translation_agent:app --reload --port 8003
 
----
-
-## 10. Geplanter Tech Stack
-
-### Frontend
-
-* Next.js
-* TypeScript
-* Tailwind CSS
-* shadcn/ui
-* Plotly.js oder Recharts
-
-### Backend
-
-* FastAPI
-* Python
-* pandas
-* numpy
-* httpx
-* Pydantic
-
-### Daten
-
-* Sybilion API
-* Mockdaten für Standort und Business-Annahmen
-* JSON-Dateien für MVP
-* gecachte Forecast-Artefakte als Fallback
-
-### Decision Engine
-
-Eigene Python-Logik für:
-
-* Umsatzberechnung
-* Kostenberechnung
-* Break-even-Wahrscheinlichkeit
-* Risikobewertung
-* Szenario-Simulation
-* Empfehlung
-
-### Optional
-
-* LLM nur für verständliche Erklärung
-* nicht für die eigentliche Entscheidung
-
----
-
-## 11. Geplante Architektur
-
-```text
-Frontend UI
-  ↓
-Business Idea Form
-  ↓
-FastAPI Backend
-  ↓
-Sybilion API Client
-  ↓
-Forecast Parser
-  ↓
-Decision Engine
-  ↓
-Scenario Engine
-  ↓
-Dashboard + Explanation Layer
+# frontend
+cd frontend && npm run dev
 ```
 
 ---
 
-## 12. Wichtige Komponenten
+## Configuration
 
-### BusinessForm
+Copy `.env-example` to `.env` (auto-loaded by the backend on import; real shell variables take precedence). **All keys are optional** — without them, MarketPilot runs on deterministic mock fallbacks, so the demo works offline.
 
-Nutzer geben ihre Geschäftsidee ein.
-
-### ForecastChart
-
-Zeigt Forecast mit Unsicherheit:
-
-* p10
-* p50
-* p90
-* Confidence Band
-
-### DriverImportanceChart
-
-Zeigt, welche Faktoren die Prognose treiben.
-
-### DecisionCard
-
-Zeigt die finale Empfehlung:
-
-* Launch
-* Adapt concept
-* Delay
-* Do not launch
-
-### ReasoningPanel
-
-Zeigt, warum die Entscheidung getroffen wurde.
-
-### ScenarioControls
-
-Erlaubt Live-Anpassungen:
-
-* Miete erhöhen
-* Konkurrenz erhöhen
-* Foot Traffic senken
-* Warenkorb erhöhen
-* Marge verändern
-* Kostenschock simulieren
-* Nachfrageschock simulieren
+| Variable | Required | Description |
+|---|---|---|
+| `FEATHERLESS_API_KEY` | No | Featherless LLM key. Missing → deterministic mock extraction/judgment. |
+| `FEATHERLESS_BASE_URL` | No | OpenAI-compatible base URL. Default `https://api.featherless.ai/v1`. |
+| `FEATHERLESS_MODEL` | No | Default `meta-llama/Meta-Llama-3.1-8B-Instruct`. |
+| `SYBILION_API_TOKEN` | No | Sybilion forecast token. Missing → synthetic forecast fallback. |
+| `DATA_ENGINEER_URL` | No | URL of a separately running Data-Engineer service. Missing → in-process call. |
+| `MODEL_MODE` | No | `dev` (fail loudly, no fallbacks) or `prod` (loud fallbacks). Default `prod` for the demo. |
 
 ---
 
-## 13. Warum unsere Idee stark ist
+## API overview
 
-Unsere Idee ist stark, weil sie:
+| Service (port) | Method | Route | Purpose |
+|---|---|---|---|
+| Translation (`:8003`) | `POST` | `/api/extract` | `{ userInput }` → `{ descriptions }` |
+| Translation (`:8003`) | `POST` | `/api/confirm` | confirmed descriptions → verdict + forecast summary |
+| Translation (`:8003`) | `POST` | `/api/refine` | next-round refinement (live what-if at the idea level) |
+| Translation (`:8003`) | `GET` | `/health` | health + LLM / Sybilion availability |
+| Data-Engineer (`:8002`) | `POST` | `/data/timeseries` | `{ description, keyWord[] }` → time series + metadata |
+| Data-Engineer (`:8002`) | `GET` | `/health` | health check |
 
-* ein reales Problem löst
-* leicht verständlich ist
-* gut demonstrierbar ist
-* Forecasting sinnvoll nutzt
-* Unsicherheit sichtbar macht
-* konkrete Entscheidungen erzeugt
-* nicht nur eine Chatbot-Zusammenfassung ist
-* eigene Business- und Decision-Logik enthält
-* live auf Änderungen reagieren kann
-* auf viele Geschäftsideen skalierbar ist
+Quick smoke test:
 
----
-
-## 14. Wichtigster Pitch-Satz
-
-```text
-The Sybilion API forecasts relevant market signals. Our agent translates those probabilistic forecasts into transparent business launch decisions.
+```bash
+curl -X POST http://localhost:8003/api/extract \
+  -H "Content-Type: application/json" \
+  -d '{"userInput":"I want to open an ice cream shop in Vienna'\''s 1st district."}'
 ```
 
-Oder kürzer:
+Full request/response contracts live in `ARCHITECTURE.md` and `FLOW_AND_AGENTS.md`.
 
-```text
-We turn probabilistic forecasts into go/no-go business decisions for future entrepreneurs.
+---
+
+## Testing
+
+```bash
+source env/bin/activate
+pytest -q
 ```
 
 ---
 
-## 15. MVP-Ziel
+## Live demo script
 
-Unser MVP soll mindestens Folgendes können:
+A 60-second walkthrough for the stage:
 
-* Default Use Case: Premium-Weinshop im 1. Bezirk in Wien
-* detailliertes Eingabeformular
-* Mockdaten für Standort und Business-Faktoren
-* Sybilion API Integration oder Mock-Fallback
-* Forecast mit Confidence Bands
-* Driver Importance Anzeige
-* eigene Decision Engine
-* Break-even-Wahrscheinlichkeit
-* finale Empfehlung
-* Live-Szenarioänderung
-* sichtbare Änderung der Empfehlung
+1. **Load the default scenario** — ice cream shop, Vienna 1st district.
+2. **Run the analysis** — forecast with confidence bands, driver importance, break-even probability, expected monthly profit, and a verdict appear.
+3. **First recommendation** — e.g. *Adapt concept*: strong tourism-driven demand, but high rent and seasonality make a pure retail concept risky.
+4. **Change an assumption live** — raise monthly rent from €8,000 to €13,000.
+5. **The agent reacts** — break-even probability drops, the verdict shifts toward *Do not launch / change location*.
+6. **Improve the concept** — raise the average basket size and add tasting revenue; the verdict recovers toward *Adapt concept / Launch*.
+
+This shows the three things that matter: the forecast drives the decision, the reasoning is visible, and the agent adapts when an assumption shifts.
 
 ---
 
-## 16. Mögliche Erweiterungen
+## Project status & roadmap
 
-Später könnte das System weitere Geschäftsideen unterstützen:
+This is an active hackathon prototype. The live demo path runs the full idea → forecast → verdict loop end-to-end. Work in progress / planned:
 
-* Café
-* Fitnessstudio
-* Tankstelle
-* Boutique
-* Restaurant
-* Bäckerei
-* Coworking Space
-* Beauty Salon
-* Mobility Hub
+- Converging the verdict fully onto the deterministic decision model in `report_agent.py` (see `backend/MODEL.md`).
+- Wiring the standalone `data-engineer-agent/` (real sources: Eurostat, commodities, …) in place of the mock series.
+- Multi-location comparison (e.g. Vienna 1st vs 7th vs 16th district) and additional business types (café, gym, bakery, coworking, …).
 
-Außerdem könnten mehrere Standorte verglichen werden:
-
-```text
-Vienna 1st district vs Vienna 7th district vs Vienna 16th district
-```
-
-Das würde die Anwendung noch stärker machen, ist aber für den MVP nicht notwendig.
+See `ARCHITECTURE.md` for the detailed current-vs-target breakdown.
 
 ---
 
-## 17. Zusammenfassung
+## Team & acknowledgements
 
-Wir bauen keinen einfachen Forecast-Viewer und keinen simplen Chatbot.
+Built at **Zero One Hack, Vienna (May 2025)** for the Sybilion **Forecasting AI** track.
+Forecasting infrastructure provided by **Sybilion**; LLM inference via **Featherless**.
 
-Wir bauen einen **Decision Agent**, der Forecasts, Unsicherheit, Treiber, Standortannahmen und Business-Logik kombiniert, um Gründern zu helfen, bessere Entscheidungen zu treffen.
+**Team**
+- **Alexander Hess** — Frontend
+- **Ivan Popov** — Math model development
+- **Leo Solomon** — Translation agent
+- **Stanislav Kononov** — Data engineering
 
-Der Kern der Idee:
+---
 
-```text
-Business idea + location + forecast + uncertainty + decision logic
-=
-transparent launch recommendation
-```
+## License
 
+Licensed under the **Business Source License 1.1** (Licensor: *Market Pilot — Serebro*, © 2025). The Licensed Work may be copied and redistributed for **non-production purposes only**, unmodified; production use, offering it as a service, sublicensing, or creating derivative works requires a separate written agreement from the Licensor. On the **Change Date (2031-01-01)** the license converts to the **MIT License**. See [`LICENSE`](./LICENSE) for the full terms.
