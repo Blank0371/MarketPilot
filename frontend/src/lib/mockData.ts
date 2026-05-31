@@ -37,11 +37,12 @@ export const stepDefinitions: StepDefinition[] = [
   { id: 3, label: "Decision cockpit", description: "Forecast-driven verdict" },
 ];
 
+// Each chip maps to a prepared show-case in mockCases.ts (mock data mode).
 export const exampleChips: string[] = [
-  "Ice cream shop in Vienna",
-  "Premium café in Berlin",
-  "Wine bar in Paris",
-  "Fitness studio in Amsterdam",
+  "Ice cream shop in Vienna's 1st district",
+  "Specialty coffee & bakery in Vienna",
+  "Boutique wine shop in Vienna",
+  "Luxury watch boutique in Vienna",
   "Urban gelato kiosk",
 ];
 
@@ -59,11 +60,11 @@ export const mockDescriptions: string[] = [
 // ─── Economic constants (aligned with allowedOverrides base values) ───────────
 
 export const ECONOMICS = {
-  base_revenue: 24000,             // EUR/month — from mockReport
-  base_basket_size: 42,            // EUR — from allowedOverrides
-  base_opening_days: 22,           // days/month — from allowedOverrides
-  staff_cost_per_employee: 2500,   // EUR/month per non-founder employee
-  fixed_overhead: 3500,            // EUR/month (rent + utilities + misc)
+  base_revenue: 24000, // EUR/month — from mockReport
+  base_basket_size: 42, // EUR — from allowedOverrides
+  base_opening_days: 22, // days/month — from allowedOverrides
+  staff_cost_per_employee: 2500, // EUR/month per non-founder employee
+  fixed_overhead: 3500, // EUR/month (rent + utilities + misc)
   /** Derived: base_revenue / (base_basket × base_days) */
   daily_customers: 24000 / (42 * 22), // ≈ 26.0
 };
@@ -87,7 +88,7 @@ export const allowedOverrides: AllowedOverride[] = [
     type: "percentage",
     base_value: 0.35,
     min: 0.15,
-    max: 0.70,
+    max: 0.7,
     description: "Expected margin after product purchasing costs.",
   },
   {
@@ -201,35 +202,40 @@ export const mockReport: Report = {
       importance: 0.84,
       direction: "positive",
       horizon: { month_1: 0.84, month_3: 0.79, month_6: 0.52 },
-      explanation: "Vienna's 1st-district tourist volume is the primary demand driver — peak July and August are make-or-break months.",
+      explanation:
+        "Vienna's 1st-district tourist volume is the primary demand driver — peak July and August are make-or-break months.",
     },
     {
       name: "Seasonality",
       importance: 0.77,
       direction: "mixed",
       horizon: { month_1: 0.65, month_3: 0.82, month_6: 0.77 },
-      explanation: "Demand swings 10× between peak summer and deep winter — managing cash flow across this cycle is the core operational challenge.",
+      explanation:
+        "Demand swings 10× between peak summer and deep winter — managing cash flow across this cycle is the core operational challenge.",
     },
     {
       name: "Rent pressure",
       importance: 0.62,
       direction: "negative",
       horizon: { month_1: 0.58, month_3: 0.62, month_6: 0.67 },
-      explanation: "1st-district commercial rents are forecast to rise. Fixed-cost base increases while winter revenue stays flat.",
+      explanation:
+        "1st-district commercial rents are forecast to rise. Fixed-cost base increases while winter revenue stays flat.",
     },
     {
       name: "Competition density",
       importance: 0.51,
       direction: "negative",
       horizon: { month_1: 0.49, month_3: 0.53, month_6: 0.55 },
-      explanation: "The tourist corridor supports multiple players, but differentiation is critical to avoid price competition.",
+      explanation:
+        "The tourist corridor supports multiple players, but differentiation is critical to avoid price competition.",
     },
     {
       name: "Consumer spending",
       importance: 0.48,
       direction: "positive",
       horizon: { month_1: 0.52, month_3: 0.47, month_6: 0.43 },
-      explanation: "Vienna's high spending index supports premium pricing and above-average basket sizes.",
+      explanation:
+        "Vienna's high spending index supports premium pricing and above-average basket sizes.",
     },
   ],
   investment_breakdown: [
