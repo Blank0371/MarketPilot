@@ -12,16 +12,7 @@ export function Header({ productName, navLinks, ctaLabel, onCta }: HeaderProps) 
   return (
     <header className="sticky top-0 z-30 border-b border-white/5 bg-background/70 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        <a href="#top" className="flex items-center gap-2">
-          <img
-            src="/brand/logo.png"
-            alt={`${productName} logo`}
-            className="h-8 w-8 rounded-lg object-contain shadow-[0_0_24px_-6px_var(--primary)]"
-          />
-          <span className="text-base font-semibold tracking-tight text-foreground">
-            {productName}
-          </span>
-        </a>
+        <a href="#top" className="flex items-center" />
         <nav className="hidden items-center gap-8 md:flex">
           {navLinks.map((link) => (
             <a
