@@ -802,17 +802,11 @@ def _build_real_query(description: str, key_word: list[str]) -> str:
 # ---------------------------------------------------------------------------
 # Core
 # ---------------------------------------------------------------------------
-def _build_metadata(description: str, key_word: list[str]) -> dict:
+def _build_metadata(description: str) -> dict:
     """Echo the request into metadata: title/description from the description,
     keywords from the incoming list enriched with generic demand terms."""
     title = description.strip()
     meta_description = title if title.endswith(".") else f"{title}."
-
-    seen: set[str] = set()
-    for candidate in (*key_word, *ENRICHMENT_KEYWORDS):
-        cleaned = candidate.strip()
-        if cleaned:
-            seen.add(cleaned.lower())
 
     return {"description": meta_description}
 
@@ -897,8 +891,7 @@ def get_timeseries(description: str, key_word: list[str] | None = None) -> dict:
                 )
                 return {
                     "timeseries_metadata": _build_metadata(
-                        description,
-                        meta_keywords + [f"source:{real_result.source_ref}", "provenance:real"],
+                        description
                     ),
                     "timeseries": real_result.series,
                 }
@@ -928,7 +921,7 @@ def get_timeseries(description: str, key_word: list[str] | None = None) -> dict:
         logger.warning("timeseries diagnostics for %r: %s", description, "; ".join(diagnostics))
 
     return {
-        "timeseries_metadata": _build_metadata(description, meta_keywords + ["provenance:mock"]),
+        "timeseries_metadata": _build_metadata(description),
         "timeseries": series,
     }
 
