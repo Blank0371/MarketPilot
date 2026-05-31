@@ -1,149 +1,42 @@
 # MarketPilot
 
-> **Navigate uncertainty before you launch.**
+MarketPilot is a forecast-driven decision application for evaluating location-based business ideas.
 
-A forecasting-driven **decision agent** for future business owners and the investors who back them. Type a business idea in plain language and MarketPilot turns a probabilistic market forecast into a transparent **go / no-go** recommendation — with the numbers, drivers, and reasoning all on the table.
+Current runnable stack:
+- `backend.data_engineer` (FastAPI, port `8002`)
+- `backend.translation_agent` (FastAPI, port `8003`)
+- `frontend` (TanStack Start, port `5173`)
 
-Built for **Zero One Hack, Vienna · May 2025** — Track 3: *Forecasting AI* (Challenge owner: **Sybilion**).
-
-**Stack:** Python · FastAPI · TanStack Start · React · TypeScript · Sybilion Forecasting API · Featherless LLM
-
----
-
-## What it does
-
-Founders have ideas; they rarely have a defensible answer to *"will this actually work, here, right now?"* Investors face the mirror image: a pitch deck and a gut feeling. MarketPilot sits between the two.
-
-You describe an idea in free text — for example:
-
-> "I want to open an ice cream shop in Vienna's 1st district."
-
-MarketPilot then:
-
-1. extracts the **quantifiable factors** behind the idea (rent, foot traffic, seasonality, margin, tourism dependency, …) and lets you edit them,
-2. pulls a **historical monthly time series** for the relevant market signal,
-3. runs a **probabilistic forecast** through the Sybilion API (downside / base / upside, with confidence bands and driver importance),
-4. computes the economics — expected revenue, costs, investment, break-even probability, payback — and returns a clear verdict:
-
-| Verdict | Meaning |
-|---|---|
-| **Launch** | Economically attractive under current assumptions. |
-| **Adapt concept** | Real potential, but the current concept is too risky — adjust it. |
-| **Delay / change location** | Could work, but not under current conditions or at this location. |
-| **Do not launch** | Not attractive under current assumptions. |
-
-The point is not just the label. It's the **visible reasoning** behind it — and the ability to change an assumption live (rent goes up, basket size goes up) and watch the recommendation move.
+This README reflects the **current code/runtime behavior**.
 
 ---
 
-## Who it's for
+## 1. What is implemented now
 
-MarketPilot serves two sides of the same decision. The numbers and reasoning are identical; what differs is the question being asked.
+- Idea input -> description extraction (`/api/extract`)
+- Description confirmation -> translation pipeline (`/api/confirm`)
+- Data-engineer time-series endpoint (`/data/timeseries`)
+- Frontend dashboard with two data modes:
+  - `mock` (default)
+  - `endpoint` (calls backend at `:8003`)
 
-**Aspiring business owners** — to pressure-test an idea before committing capital: is the demand there, is the location right, where does it break even, and what would need to change to make it viable.
-
-**Investors (VCs, angels, family offices)** — for **investment risk evaluation**: an independent second opinion on a pitched venture, grounding gut feeling in a probabilistic demand forecast, explicit downside/upside scenarios, and a transparent break-even probability rather than a founder's projections alone.
-
-**Banks and lenders** — for **loan and credit evaluation**: assessing the viability of a small-business or location-based venture before extending financing, with a traceable, reproducible verdict and visible driver analysis that can be attached to a credit file.
-
-In every case the value is the same: a forecast plus a driver list does not, by itself, change a decision. MarketPilot turns probabilistic market signals into a defensible **go / no-go** call — with the reasoning legible to a non-expert and reproducible enough to stand up to scrutiny.
-
----
-
-## How it works
-
-```
-User types a free-text business idea
-        │
-        ▼
-Translation agent (LLM)   →  extracts standardized DESCRIPTIONS of the
-        │                    quantifiable factors (rent, footfall, seasonality…)
-        ▼
-        (user edits / confirms the descriptions in the UI)
-        │
-        ▼
-Translation agent (LLM)   →  derives 3–6 forecasting KEYWORDS
-        │
-        ▼
-Data-Engineer agent       →  returns a historical monthly time series + metadata
-        │
-        ▼
-Sybilion API              →  probabilistic forecast: p10 / p50 / p90,
-        │                    confidence bands, driver importance, backtest metrics
-        ▼
-Decision engine           →  expected revenue, costs, investment, break-even
-        │                    probability, risk-adjusted profit → verdict + reason
-        ▼
-Frontend dashboard        →  forecast chart · drivers · financials · verdict
-        │
-        ▼
-What-if controls          →  change an assumption, recompute, compare before/after
-```
-
-The standardized factors the agent reasons over are **rent, staff costs, location foot traffic, average basket price, margin, seasonality, and tourism dependency** — each one rephrased to fit the specific idea.
+Important:
+- `report_agent.py` and `sybilion_client.py` exist in the repo, but are not the primary path started by `start.sh`.
+- Frontend what-if and add-factor flows are still mock-driven.
 
 ---
 
-## Tech stack
+## 2. Prerequisites
 
-**Frontend** (`frontend/`, port `5173`)
-- React 19 + TypeScript on **TanStack Start** (file-based routing, Vite)
-- Tailwind CSS v4 + **shadcn/ui** (Radix primitives)
-- Recharts for forecast/driver visualizations, Framer Motion for transitions
-- Ships with an offline mock mode so the dashboard runs without a backend
-
-**Backend** (`backend/`, ports `8002` + `8003`)
-- Python + **FastAPI** + Pydantic, served by Uvicorn
-- **Translation agent** (`:8003`) — idea → descriptions → keywords; orchestrates the pipeline
-- **Data-Engineer agent** (`:8002`) — historical monthly time-series provider
-- LLM calls via **Featherless** (OpenAI-compatible; Llama 3.1 8B by default), with a deterministic mock fallback when no key is set
-- Forecasting via the **Sybilion** Python SDK
-
----
-
-## Project structure
-
-```
-ZeroOneHack_01/
-├── backend/
-│   ├── translation_agent.py    # idea → descriptions → keywords; pipeline orchestrator (:8003)
-│   ├── data_engineer.py        # historical monthly time-series endpoint (:8002)
-│   ├── report_agent.py         # decision-report producer (decision engine)
-│   ├── sybilion_client.py      # Sybilion forecast wrapper + synthetic fallback
-│   ├── requirements.txt
-│   └── MODEL.md                # decision-model specification
-├── frontend/                   # TanStack Start + React + TS dashboard (:5173)
-│   └── src/lib/                # api.ts, mockApi.ts, mockData.ts, types.ts
-├── data-engineer-agent/        # standalone real data-engineer service (roadmap)
-├── mock/                       # committed mock series, forecast, drivers, backtest (fallbacks)
-├── tests/                      # pytest suite for the backend agents
-├── start.sh                    # launches both backend agents + the frontend
-├── .env-example                # copy to .env for local secrets
-├── ARCHITECTURE.md             # system wiring (canonical)
-├── FLOW_AND_AGENTS.md          # product flow + agent contracts
-├── FOR_DEVELOPERS.md           # detailed setup & runbook
-└── README.md                   # this file
-```
-
----
-
-## Getting started
-
-### Prerequisites
 - Python 3.11+
-- Node.js 18+ (npm; **bun** also works — the repo includes a `bun.lock`)
+- Node.js 18+
+- `npm`
 
-### 1. Clone and configure
+---
 
-```bash
-git clone https://github.com/stnleey/ZeroOneHack_01.git
-cd ZeroOneHack_01
-cp .env-example .env   # fill in keys if you have them — optional, see below
-```
+## 3. Setup
 
-### 2. Install backend dependencies
-
-`start.sh` expects the virtualenv at `env/` (it falls back to `.venv/`):
+From repo root:
 
 ```bash
 python3 -m venv env
@@ -151,133 +44,189 @@ source env/bin/activate
 pip install -r backend/requirements.txt
 ```
 
-### 3. Install frontend dependencies
+Frontend dependencies:
 
 ```bash
 cd frontend
-npm install        # or: bun install
+npm install
 cd ..
 ```
 
-### 4. Run everything
+Environment file:
+
+```bash
+cp .env-example .env
+```
+
+---
+
+## 4. Environment variables
+
+### Required for a meaningful end-to-end backend run
+
+- `FEATHERLESS_API_KEY`  
+  Required if you want LLM-based extraction/routing instead of deterministic fallback behavior.
+
+### Optional but recommended
+
+- `FEATHERLESS_BASE_URL` (default: `https://api.featherless.ai/v1`)
+- `FEATHERLESS_MODEL`
+- `REAL_DATA_ENABLED` (default in code is `true`)
+- `DATA_ENGINEER_URL` (only if translation agent should call an external DE service instead of in-process)
+
+### Notes on keys and behavior
+
+- The application can start without API keys.
+- Without LLM/network availability, many requests fall back to deterministic mock/proxy behavior.
+- If you want to validate real-source usage, you need working network access and valid keys.
+
+---
+
+## 5. Run application
+
+### One-command startup
 
 ```bash
 ./start.sh
 ```
 
-This launches the Data-Engineer agent (`:8002`), the Translation agent (`:8003`), and the frontend dev server (`:5173`), and stops them all on `Ctrl+C`. Then open:
+Starts:
+- Data Engineer: `http://localhost:8002`
+- Translation Agent: `http://localhost:8003`
+- Frontend: `http://localhost:5173`
 
-```
-http://localhost:5173
-```
+Stop with `Ctrl+C`.
 
-Ports are overridable:
+### Port overrides
 
 ```bash
 DATA_ENGINEER_PORT=8012 TRANSLATION_PORT=8013 FRONTEND_PORT=5174 ./start.sh
 ```
 
-### Running services individually
+---
+
+## 6. Run services manually
+
+Terminal 1:
 
 ```bash
-# backend agents (separate terminals)
 source env/bin/activate
 uvicorn backend.data_engineer:app --reload --port 8002
-uvicorn backend.translation_agent:app --reload --port 8003
-
-# frontend
-cd frontend && npm run dev
 ```
 
----
-
-## Configuration
-
-Copy `.env-example` to `.env` (auto-loaded by the backend on import; real shell variables take precedence). **All keys are optional** — without them, MarketPilot runs on deterministic mock fallbacks, so the demo works offline.
-
-| Variable | Required | Description |
-|---|---|---|
-| `FEATHERLESS_API_KEY` | No | Featherless LLM key. Missing → deterministic mock extraction/judgment. |
-| `FEATHERLESS_BASE_URL` | No | OpenAI-compatible base URL. Default `https://api.featherless.ai/v1`. |
-| `FEATHERLESS_MODEL` | No | Default `meta-llama/Meta-Llama-3.1-8B-Instruct`. |
-| `SYBILION_API_TOKEN` | No | Sybilion forecast token. Missing → synthetic forecast fallback. |
-| `DATA_ENGINEER_URL` | No | URL of a separately running Data-Engineer service. Missing → in-process call. |
-| `MODEL_MODE` | No | `dev` (fail loudly, no fallbacks) or `prod` (loud fallbacks). Default `prod` for the demo. |
-
----
-
-## API overview
-
-| Service (port) | Method | Route | Purpose |
-|---|---|---|---|
-| Translation (`:8003`) | `POST` | `/api/extract` | `{ userInput }` → `{ descriptions }` |
-| Translation (`:8003`) | `POST` | `/api/confirm` | confirmed descriptions → verdict + forecast summary |
-| Translation (`:8003`) | `POST` | `/api/refine` | next-round refinement (live what-if at the idea level) |
-| Translation (`:8003`) | `GET` | `/health` | health + LLM / Sybilion availability |
-| Data-Engineer (`:8002`) | `POST` | `/data/timeseries` | `{ description, keyWord[] }` → time series + metadata |
-| Data-Engineer (`:8002`) | `GET` | `/health` | health check |
-
-Quick smoke test:
+Terminal 2:
 
 ```bash
-curl -X POST http://localhost:8003/api/extract \
-  -H "Content-Type: application/json" \
-  -d '{"userInput":"I want to open an ice cream shop in Vienna'\''s 1st district."}'
+source env/bin/activate
+uvicorn backend.translation_agent:app --reload --port 8003
 ```
 
-Full request/response contracts live in `ARCHITECTURE.md` and `FLOW_AND_AGENTS.md`.
+Terminal 3:
+
+```bash
+cd frontend
+npm run dev
+```
 
 ---
 
-## Testing
+## 7. Frontend mode switch
+
+On the main page, use the `Data mode` toggle:
+- `mock` -> local mock API flow
+- `endpoint` -> real calls to backend (`http://127.0.0.1:8003`)
+
+If you want to test backend pipeline, switch to `endpoint`.
+
+---
+
+## 8. API smoke tests
+
+### Data Engineer health
+
+```bash
+curl http://localhost:8002/health
+```
+
+### Translation health
+
+```bash
+curl http://localhost:8003/health
+```
+
+### Data Engineer request
+
+```bash
+curl -s -X POST http://localhost:8002/data/timeseries \
+  -H "Content-Type: application/json" \
+  -d '{"description":"Get CPI inflation in Austria for the last 10 years"}' | jq
+```
+
+### Translation extract
+
+```bash
+curl -s -X POST http://localhost:8003/api/extract \
+  -H "Content-Type: application/json" \
+  -d '{"userInput":"I want to launch a wine tasting studio with retail sales in Vienna."}' | jq
+```
+
+### Translation confirm
+
+```bash
+curl -s -X POST http://localhost:8003/api/confirm \
+  -H "Content-Type: application/json" \
+  -d '{"descriptions":["Tourism seasonality in Vienna","Labor costs in Austria","CPI trends in Austria"]}' | jq
+```
+
+---
+
+## 9. Real vs mock diagnostics
+
+For `backend.data_engineer`, check logs:
+
+- Real source path:
+  - `REAL_SOURCE_USED ... path=llm_selection`
+  - `REAL_SOURCE_USED ... path=planner`
+- Mock fallback path:
+  - `data_engineer provenance=MOCK ...`
+
+This is the fastest way to verify whether a request used a real provider or fallback.
+
+---
+
+## 10. Tests
+
+Run all tests:
 
 ```bash
 source env/bin/activate
 pytest -q
 ```
 
----
+Run Data Engineer tests only:
 
-## Live demo script
-
-A 60-second walkthrough for the stage:
-
-1. **Load the default scenario** — ice cream shop, Vienna 1st district.
-2. **Run the analysis** — forecast with confidence bands, driver importance, break-even probability, expected monthly profit, and a verdict appear.
-3. **First recommendation** — e.g. *Adapt concept*: strong tourism-driven demand, but high rent and seasonality make a pure retail concept risky.
-4. **Change an assumption live** — raise monthly rent from €8,000 to €13,000.
-5. **The agent reacts** — break-even probability drops, the verdict shifts toward *Do not launch / change location*.
-6. **Improve the concept** — raise the average basket size and add tasting revenue; the verdict recovers toward *Adapt concept / Launch*.
-
-This shows the three things that matter: the forecast drives the decision, the reasoning is visible, and the agent adapts when an assumption shifts.
+```bash
+source env/bin/activate
+pytest -q tests/test_data_engineer.py
+```
 
 ---
 
-## Project status & roadmap
+## 11. Repository pointers
 
-This is an active hackathon prototype. The live demo path runs the full idea → forecast → verdict loop end-to-end. Work in progress / planned:
-
-- Converging the verdict fully onto the deterministic decision model in `report_agent.py` (see `backend/MODEL.md`).
-- Wiring the standalone `data-engineer-agent/` (real sources: Eurostat, commodities, …) in place of the mock series.
-- Multi-location comparison (e.g. Vienna 1st vs 7th vs 16th district) and additional business types (café, gym, bakery, coworking, …).
-
-See `ARCHITECTURE.md` for the detailed current-vs-target breakdown.
-
----
-
-## Team & acknowledgements
-
-Built at **Zero One Hack, Vienna (May 2025)** for the Sybilion **Forecasting AI** track.
-Forecasting infrastructure provided by **Sybilion**; LLM inference via **Featherless**.
-
-**Team**
-- **Alexander Hess** — Frontend
-- **Ivan Popov** — Math model development
-- **Leo Solomon** — Translation agent
-- **Stanislav Kononov** — Data engineering
+- Backend architecture doc: `backend/TECHNICAL_ARCHITECTURE.md`
+- Backend runtime code:
+  - `backend/data_engineer.py`
+  - `backend/translation_agent.py`
+  - `backend/data_engineer_core/`
+- Frontend entry route:
+  - `frontend/src/routes/index.tsx`
 
 ---
 
-## License
+## 12. Team
 
-Licensed under the **Business Source License 1.1** (Licensor: *Market Pilot — Serebro*, © 2025). The Licensed Work may be copied and redistributed for **non-production purposes only**, unmodified; production use, offering it as a service, sublicensing, or creating derivative works requires a separate written agreement from the Licensor. On the **Change Date (2031-01-01)** the license converts to the **MIT License**. See [`LICENSE`](./LICENSE) for the full terms.
+- Alexander Hess — Frontend
+- Ivan Popov — Math model development
+- Leo Solomon — Translation agent
+- Stanislav Kononov — Data engineering
