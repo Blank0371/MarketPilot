@@ -545,10 +545,10 @@ def _adapt_query_response_to_monthly_series(response: dict) -> dict[str, float]:
 # LLM routing (Featherless) — classify + select a source. Never numbers.
 # ---------------------------------------------------------------------------
 _LLM_ROUTING_SYSTEM = (
-    "You are a data routing classifier for an offline retail planning agent. "
-    "You map one atomic data description to one supported category and select one "
-    "source from the provided connected sources. You never invent numbers, never "
-    "produce a time series, and never invent source IDs. Return only valid JSON."
+    "You are a practical data-routing assistant for an offline retail planning agent. "
+    "Map one atomic business description to the closest supported category and choose "
+    "the best available real or proxy dataset from the provided catalog. "
+    "Do not invent numbers or time-series values. Return only valid JSON."
 )
 
 
@@ -561,6 +561,10 @@ def _llm_routing_user(description: str, sources: list[dict], dataset_catalog: li
         "- Select source_id only from the connected sources below (or null).\n"
         "- Select dataset_id only from the datasets catalog below (or null).\n"
         "- Select metric only from the selected dataset metrics (or null).\n"
+        "- Prefer returning a real/proxy dataset from the catalog when it is even moderately relevant.\n"
+        "- If exact match is unavailable, choose the closest proxy dataset and explain briefly in reason.\n"
+        "- For local Austria-oriented descriptions, prefer statistik_austria_* datasets when relevant.\n"
+        "- Use null dataset/metric only when there is no defensible mapping at all.\n"
         "- If no real/proxy source fits, pick the deterministic mock source for the closest category.\n"
         '- If it cannot map to any supported category, use category "unsupported", '
         'source_quality "none", source_id null.\n'
@@ -568,6 +572,10 @@ def _llm_routing_user(description: str, sources: list[dict], dataset_catalog: li
         f"Connected sources:\n{json.dumps(sources, indent=2)}\n\n"
         f"Datasets catalog:\n{json.dumps(dataset_catalog, indent=2)}\n\n"
         f"Description:\n{description}\n\n"
+        "Examples (guidance, not strict):\n"
+        "- wage/staff/payroll -> statistik_austria_gross_wages_index (metric: gross_wages_index or staff_costs)\n"
+        "- tourism/overnight/visitor seasonality -> statistik_austria_tourism_nights (metric: tourism_nights or seasonality_proxy)\n"
+        "- inflation/cpi basket-price proxy -> statistik_austria_hvpi_2025 or eurostat_hicp_all_items\n\n"
         "Return exactly this JSON shape:\n"
         '{"category":"...","source_id":"... or null","source_quality":"exact|proxy|mock|none",'
         '"dataset_id":"... or null","metric":"... or null",'
@@ -800,15 +808,12 @@ def _build_metadata(description: str, key_word: list[str]) -> dict:
     title = description.strip()
     meta_description = title if title.endswith(".") else f"{title}."
 
-    # keywords: list[str] = []
     seen: set[str] = set()
     for candidate in (*key_word, *ENRICHMENT_KEYWORDS):
         cleaned = candidate.strip()
-        if cleaned and cleaned.lower() not in seen:
+        if cleaned:
             seen.add(cleaned.lower())
-            # keywords.append(cleaned)
 
-    # return {"title": title, "description": meta_description, "keywords": keywords}
     return {"description": meta_description}
 
 
@@ -843,6 +848,12 @@ def get_timeseries(description: str, key_word: list[str] | None = None) -> dict:
                         llm_route["metric"],
                     )
                     logger.info(
+                        "REAL_SOURCE_USED source=%s dataset=%s metric=%s path=llm_selection",
+                        real_result.source_ref,
+                        llm_route["dataset_id"],
+                        llm_route["metric"],
+                    )
+                    logger.info(
                         "data-request %r -> real(LLM) source=%s dataset=%s metric=%s",
                         description,
                         real_result.source_ref,
@@ -870,6 +881,11 @@ def get_timeseries(description: str, key_word: list[str] | None = None) -> dict:
             if not diagnostics:
                 logger.info(
                     "data_engineer provenance=REAL_PLANNER source=%s status=%s",
+                    real_result.source_ref,
+                    real_result.status,
+                )
+                logger.info(
+                    "REAL_SOURCE_USED source=%s status=%s path=planner",
                     real_result.source_ref,
                     real_result.status,
                 )

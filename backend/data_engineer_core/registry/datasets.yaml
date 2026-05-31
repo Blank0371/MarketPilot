@@ -10,6 +10,42 @@
   limitations:
     - "No verified district-level rent time series"
 
+- id: statistik_austria_tourism_nights
+  source_id: statistik_austria_open_data
+  title: Accommodation statistics by country of origin and federal provinces
+  verified: true
+  domain: tourism
+  metrics: [tourism_nights, location_foot_traffic_proxy, seasonality_proxy, tourism_dependency]
+  time_series: true
+  geo_granularity: [austria, federal_state]
+  supports_vienna_districts: false
+  limitations:
+    - "Tourism overnight stays are a proxy for local retail foot traffic and demand"
+
+- id: statistik_austria_gross_wages_index
+  source_id: statistik_austria_open_data
+  title: Index of gross wages and salaries (2021=100), EU harmonised adjustment
+  verified: true
+  domain: labor
+  metrics: [gross_wages_index, staff_costs]
+  time_series: true
+  geo_granularity: [austria]
+  supports_vienna_districts: false
+  limitations:
+    - "Index proxy; not direct hourly wage level in EUR"
+
+- id: statistik_austria_hvpi_2025
+  source_id: statistik_austria_open_data
+  title: HICP inflation rates, base 2025 (monthly)
+  verified: true
+  domain: economy
+  metrics: [inflation_index, average_basket_price_proxy]
+  time_series: true
+  geo_granularity: [austria]
+  supports_vienna_districts: false
+  limitations:
+    - "Consumer price index proxy, not direct POS transaction prices"
+
 - id: eurostat_hicp_rent_index_austria
   source_id: eurostat
   title: HICP actual rentals for housing (Austria)

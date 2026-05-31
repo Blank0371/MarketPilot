@@ -5,6 +5,7 @@ from datetime import date
 
 from backend.data_engineer_core.adapters.commodities import CommodityConnector
 from backend.data_engineer_core.adapters.eurostat import EurostatAdapter
+from backend.data_engineer_core.adapters.statistik_austria import StatistikAustriaAdapter
 from backend.data_engineer_core.agents.intent_extractor import IntentExtractor
 from backend.data_engineer_core.agents.source_planner import SourcePlanner
 from backend.data_engineer_core.config import settings
@@ -58,6 +59,7 @@ class CoreRealDataProvider:
         self.source_planner = SourcePlanner(loader)
         self.eurostat = EurostatAdapter()
         self.commodities = CommodityConnector()
+        self.statistik_austria = StatistikAustriaAdapter()
 
     def fetch(self, query: str) -> RealDataResult | None:
         interpreted = self.intent_extractor.extract(query)
@@ -77,6 +79,12 @@ class CoreRealDataProvider:
                     metric=interpreted.metric,
                     last_years=interpreted.time_range.last_years,
                     geo_code=interpreted.geo.country,
+                )
+            elif candidate.source_id == "statistik_austria_open_data":
+                points = self.statistik_austria.fetch_timeseries(
+                    dataset_id=candidate.dataset_id,
+                    metric=interpreted.metric,
+                    last_years=interpreted.time_range.last_years,
                 )
             elif candidate.source_id == "yahoo_finance_commodities":
                 points = self.commodities.fetch_timeseries(
@@ -121,6 +129,13 @@ class CoreRealDataProvider:
                     geo_code="AT",
                 )
                 source_ref = f"eurostat:{dataset_id}"
+            elif dataset_id.startswith("statistik_austria_"):
+                points = self.statistik_austria.fetch_timeseries(
+                    dataset_id=dataset_id,
+                    metric=metric,
+                    last_years=last_years,
+                )
+                source_ref = f"statistik_austria_open_data:{dataset_id}"
             elif dataset_id == "yahoo_finance_commodities_monthly":
                 points = self.commodities.fetch_timeseries(
                     raw_query=raw_query,

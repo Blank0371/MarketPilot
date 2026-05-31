@@ -801,7 +801,7 @@ class _ExpectedRevenue(BaseModel):
     downside_monthly_profit_eur: int
     upside_monthly_profit_eur: int
     break_even_probability: float
-    payback_months: int
+    payback_months: int | None
 
 
 class _InvestmentItem(BaseModel):
@@ -1042,7 +1042,7 @@ def assemble_report(context: ReportContext, overrides: dict[str, Any] | None = N
         conf_value, risk["risk_level"], mape,
     )  # §8.3
     score = compute_score(economics["break_even_probability"], pb, tolerable_payback, roi, conf_value)  # §8.2
-    payback_months = int(round(pb)) if math.isfinite(pb) and monthly_profit > 0 else 0
+    payback_months = int(round(pb)) if math.isfinite(pb) and monthly_profit > 0 else None
 
     decision = {
         "label": label,
@@ -1089,7 +1089,19 @@ def assemble_report(context: ReportContext, overrides: dict[str, Any] | None = N
         reason=reason,
         runtime={"mode": mode, "fallbacks": fallbacks},
     )
-    return report.model_dump()
+    result = report.model_dump()
+    result["business_profile"] = {k: v for k, v in profile.items() if k != "reasoning"}
+    result["parameters"] = {
+        k: {"value": round(v.value, 4), "source": v.source}
+        for k, v in params.items()
+    }
+    result["confidence_breakdown"] = {
+        "c_forecast": round(conf["c_forecast"], 3),
+        "c_data": round(conf["c_data"], 3),
+        "c_band": round(conf["c_band"], 3),
+        "confidence": round(conf_value, 3),
+    }
+    return result
 
 
 def build_report(
