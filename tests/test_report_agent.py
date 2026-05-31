@@ -52,9 +52,17 @@ META = {"title": "Average Revenue of Icecream Shops in Vienna", "keywords": ["ic
 
 @pytest.fixture(autouse=True)
 def _offline_prod_env(monkeypatch):
-    """Force the deterministic offline path: no LLM, no live Sybilion, prod mode."""
-    monkeypatch.delenv("FEATHERLESS_API_KEY", raising=False)
-    monkeypatch.delenv("SYBILION_API_TOKEN", raising=False)
+    """Force the deterministic offline path: no LLM, no live Sybilion, prod mode.
+
+    We set the keys to "" (falsy) rather than delete them: a repo-root .env with a
+    real key is re-loaded by `load_dotenv()` whenever a module is first imported
+    (e.g. report_agent lazily imports translation_agent), which would *undo* a
+    plain delenv. `load_dotenv(override=False)` will not replace a var that is
+    already present (even when empty), so an empty value keeps the offline path
+    deterministic regardless of import order or a present .env.
+    """
+    monkeypatch.setenv("FEATHERLESS_API_KEY", "")
+    monkeypatch.setenv("SYBILION_API_TOKEN", "")
     monkeypatch.setenv("MODEL_MODE", "prod")
 
 

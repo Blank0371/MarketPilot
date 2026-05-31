@@ -34,8 +34,8 @@ Thumbs.db
 
 # Local env files / secrets
 .env
-.env.*
-!.env.example
+.env
+!.env
 
 # Runtime/temp
 *.log

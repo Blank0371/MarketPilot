@@ -11,14 +11,14 @@ Pipeline per endpoint:
       → Data-Engineer → timeseries
       → clean timeseries
       → Sybilion /api/v1/forecasts  (submit → poll → download artifacts)
-      → LLM judgment (with session context)
-      → { session_id, judgment, forecast_summary }
+      → report_agent.build_report  (deterministic MODEL.md v2.0 decision model)
+      → { session_id, round, conversation_turns, ...ARCHITECTURE §5.6 report + runtime }
 
   POST /api/refine   { sessionId, descriptions, initialDescriptions? }
       Same pipeline as /api/confirm for the new descriptions.
       Merges new timeseries with all prior session data before submitting to Sybilion.
-      LLM judgment receives full conversation history → context-aware update.
-      → { session_id, round, judgment, forecast_summary }
+      The report is recomputed deterministically over the full merged series.
+      → { session_id, round, conversation_turns, ...§5.6 report + runtime }
 
   GET  /api/session/{id}   — inspect session state (no LLM/DE/Sybilion calls)
   GET  /health
@@ -45,6 +45,11 @@ from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+
+# Block 4 (v2.0): the deterministic decision model. /api/confirm returns the
+# report produced here instead of an LLM judgment. (No import cycle: report_agent
+# imports translation_agent's FeatherlessClient only lazily, at call time.)
+from backend.report_agent import build_report
 
 # Load .env if python-dotenv is installed (optional dependency).
 try:
@@ -904,11 +909,12 @@ def call_data_engineer(description: str, key_word: list[str]) -> dict:
 # Core pipeline
 # ---------------------------------------------------------------------------
 def _run_pipeline(
-    session:          _Session,
-    new_descriptions: list[str],
+    session:                 _Session,
+    new_descriptions:        list[str],
     *,
-    llm_client:       FeatherlessClient | None = None,
-    sybilion_client:  SybilionClient    | None = None,
+    llm_client:              FeatherlessClient | None = None,
+    sybilion_client:         SybilionClient    | None = None,
+    forecast_horizon_months: int | None = None,
 ) -> dict[str, Any]:
     """Steps:
       0. LLM gate — reject illegal / unethical ideas immediately
@@ -982,70 +988,41 @@ def _run_pipeline(
     logger.info("STEP 5 | %d jobs complete | total forecast points: %d",
                 len(description_results), total_fc_points)
 
-    logger.info("STEP 6 | running LLM judgment | conversation turns so far: %d",
-                max(0, (len(session.messages) - 1) // 2))
+    logger.info("STEP 6 | building deterministic report (report_agent / MODEL.md v2.0)")
 
-    # Step 6 — LLM judgment receives all per-description forecasts
-    judgment = _run_judgment(
-        session, new_descriptions, description_results, client=llm_client
+    # Step 6 — deterministic decision report (replaces the old LLM judgment).
+    # Reuse the forecast already fetched in step 5 as the report's forecast_bundle
+    # so Sybilion is never called twice (ARCHITECTURE.md §0). build_report runs the
+    # MODEL.md pipeline (profiler → params → indices → economics → multi-dimensional
+    # verdict → reason) and returns the ARCHITECTURE.md §5.6 contract + a runtime block.
+    merged_ts        = session.merged_timeseries()
+    all_descriptions = session.all_descriptions()
+    forecast_bundle  = _forecast_bundle_from_results(description_results, merged_ts)
+    horizon_kwargs   = {"forecast_horizon_months": forecast_horizon_months} if forecast_horizon_months else {}
+    report = build_report(
+        merged_ts,
+        {"title": title, "description": "; ".join(all_descriptions), "keywords": session.all_keywords()},
+        "",  # the original free-text idea is not stored on the session — only the descriptions are
+        all_descriptions,
+        forecast_bundle=forecast_bundle,
+        **horizon_kwargs,
     )
-    logger.info("STEP 6 | verdict=%r  score=%s  fallback=%s",
-                judgment.get("verdict"), judgment.get("score"), judgment.get("_fallback", False))
+    logger.info("STEP 6 | verdict=%r  score=%s  risk=%s  fallbacks=%s",
+                report["decision"]["label"], report["decision"]["score"],
+                report["decision"]["risk_level"], report["runtime"]["fallbacks"])
 
     logger.info("=== PIPELINE DONE | session=%s round=%d ===",
                 session.session_id, len(session.rounds))
 
-    # Step 7 — response
-    # Aggregate forecast_series and drivers across all description results for the dashboard
-    agg_fc_series: dict[str, float] = {}
-    all_drivers:   list[dict]       = []
-    for r in description_results:
-        fc_series = r["forecast"].get("data", {}).get(
-            "forecast_series", r["forecast"].get("forecast_series", {})
-        )
-        for dt, v in fc_series.items():
-            val = v["forecast"] if isinstance(v, dict) else v
-            # Average across descriptions for the same date
-            if dt in agg_fc_series:
-                agg_fc_series[dt] = (agg_fc_series[dt] + val) / 2
-            else:
-                agg_fc_series[dt] = val
-        sig = r["signals"]
-        all_drivers.extend(sig.get("drivers", sig.get("external_signals", [])))
-
-    # Dedupe drivers by name, keeping highest importance
-    seen_drivers: dict[str, dict] = {}
-    for d in all_drivers:
-        name = d.get("name", "")
-        if name not in seen_drivers or d.get("importance", 0) > seen_drivers[name].get("importance", 0):
-            seen_drivers[name] = d
-    top_drivers = sorted(seen_drivers.values(), key=lambda d: d.get("importance", 0), reverse=True)[:5]
-
+    # Step 7 — return the §5.6 report verbatim, wrapped in a small session envelope
+    # (session_id/round) so /api/refine and the frontend can keep tracking the
+    # conversation. The old `judgment` and `forecast_summary` (incl. the fake
+    # per-description series) are gone — one forecast and one report per business.
     return {
         "session_id":         session.session_id,
         "round":              len(session.rounds),
-        "conversation_turns": max(0, (len(session.messages) - 1) // 2),
-        "judgment":           judgment,
-        "forecast_summary": {
-            "statistic_title":  title,
-            "keywords":         keywords,
-            "observations":     len(session.merged_timeseries()),
-            "forecast_horizon": 6,
-            "forecast_series":  dict(sorted(agg_fc_series.items())),
-            "top_drivers":      top_drivers,
-            "per_description":  [
-                {
-                    "description": r["description"],
-                    "forecast_series": {
-                        dt: v["forecast"] if isinstance(v, dict) else v
-                        for dt, v in r["forecast"].get("data", {}).get(
-                            "forecast_series", r["forecast"].get("forecast_series", {})
-                        ).items()
-                    },
-                }
-                for r in description_results
-            ],
-        },
+        "conversation_turns": len(session.rounds),
+        **report,
     }
 
 
@@ -1098,6 +1075,81 @@ def _run_sybilion_batch(
     ]
 
 
+# ---------------------------------------------------------------------------
+# Adapt the already-fetched Sybilion forecast into report_agent's bundle shape
+# ---------------------------------------------------------------------------
+def _aggregate_drivers(description_results: list[dict[str, Any]]) -> list[dict]:
+    """Dedupe drivers across per-description signals, keeping the highest importance."""
+    seen: dict[str, dict] = {}
+    for r in description_results:
+        sig = r.get("signals") or {}
+        for d in sig.get("drivers", sig.get("external_signals", [])):
+            name = d.get("name", "")
+            if not name:
+                continue
+            if name not in seen or d.get("importance", 0) > seen[name].get("importance", 0):
+                seen[name] = d
+    return sorted(seen.values(), key=lambda d: d.get("importance", 0), reverse=True)[:5]
+
+
+def _forecast_bundle_from_results(
+    description_results: list[dict[str, Any]],
+    timeseries: dict[str, float],
+) -> dict[str, Any]:
+    """Adapt the step-5 Sybilion forecast into report_agent's forecast_bundle shape.
+
+    Reusing the forecast already fetched in step 5 means build_report does NOT
+    call Sybilion a second time. One forecast per business (the old per-description
+    list was a fake copy of a single series), so we take the first usable forecast.
+    The translation Sybilion path returns no backtest, so MAPE/RMSE/quality are
+    derived from the same history — consistent with how sybilion_client computes
+    them. Returns {source, forecast:[{date,forecast,low,high}], drivers, backtest}.
+    """
+    from backend import sybilion_client as sc
+
+    raw_forecast: dict | None = None
+    is_mock = False
+    for r in description_results:
+        fc = r.get("forecast") or {}
+        if fc.get("_mock"):
+            is_mock = True
+        series = fc.get("data", {}).get("forecast_series") or fc.get("forecast_series")
+        if series and raw_forecast is None:
+            raw_forecast = fc if "data" in fc else {"data": {"forecast_series": series}}
+
+    forecast: list[dict] = []
+    if raw_forecast is not None:
+        try:
+            forecast = sc.parse_forecast_artifact(raw_forecast)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("could not parse Sybilion forecast (%s); deriving from history", exc)
+
+    drivers = _aggregate_drivers(description_results)
+
+    try:
+        backtest = sc.parse_backtest_artifact(sc.generate_mock_artifacts(timeseries)["backtest"])
+    except Exception:  # noqa: BLE001
+        backtest = {"mape": 0.12, "rmse": 0.0, "quality": "medium"}
+
+    # Last resort: synthesize the whole bundle from history so the report still builds.
+    if not forecast:
+        gen = sc.generate_mock_artifacts(timeseries)
+        forecast = sc.parse_forecast_artifact(gen["forecast"])
+        drivers = drivers or sc.parse_signals_artifact(gen["signals"])
+        is_mock = True
+
+    return {
+        "source": "mock" if is_mock else "live",
+        "forecast": forecast,
+        "drivers": drivers,
+        "backtest": backtest,
+    }
+
+
+# NOTE: the LLM judgment below is no longer wired into /api/confirm or /api/refine
+# — those now return the deterministic report_agent report (MODEL.md v2.0). The
+# helper is kept (unused) so the session multi-turn LLM history is available if a
+# future feature wants it; the live verdict comes from report_agent, not here.
 def _run_judgment(
     session:             _Session,
     new_descriptions:    list[str],
@@ -1139,25 +1191,28 @@ def _run_judgment(
 # Public API functions
 # ---------------------------------------------------------------------------
 def confirm_descriptions(
-    descriptions:    list[str],
+    descriptions:            list[str],
     *,
-    llm_client:      FeatherlessClient | None = None,
-    sybilion_client: SybilionClient    | None = None,
+    llm_client:              FeatherlessClient | None = None,
+    sybilion_client:         SybilionClient    | None = None,
+    forecast_horizon_months: int | None = None,
 ) -> dict[str, Any]:
     descriptions                 = _coerce_str_list(descriptions)
     session                      = _get_or_create_session(None)
     session.initial_descriptions = descriptions
     return _run_pipeline(session, descriptions,
-                         llm_client=llm_client, sybilion_client=sybilion_client)
+                         llm_client=llm_client, sybilion_client=sybilion_client,
+                         forecast_horizon_months=forecast_horizon_months)
 
 
 def refine_with_descriptions(
-    session_id:           str | None,
-    new_descriptions:     list[str],
+    session_id:              str | None,
+    new_descriptions:        list[str],
     *,
-    initial_descriptions: list[str] | None        = None,
-    llm_client:           FeatherlessClient | None = None,
-    sybilion_client:      SybilionClient    | None = None,
+    initial_descriptions:    list[str] | None        = None,
+    llm_client:              FeatherlessClient | None = None,
+    sybilion_client:         SybilionClient    | None = None,
+    forecast_horizon_months: int | None = None,
 ) -> dict[str, Any]:
     new_descriptions = _coerce_str_list(new_descriptions)
     if not new_descriptions:
@@ -1166,7 +1221,8 @@ def refine_with_descriptions(
     if initial_descriptions and not session.initial_descriptions:
         session.initial_descriptions = _coerce_str_list(initial_descriptions)
     return _run_pipeline(session, new_descriptions,
-                         llm_client=llm_client, sybilion_client=sybilion_client)
+                         llm_client=llm_client, sybilion_client=sybilion_client,
+                         forecast_horizon_months=forecast_horizon_months)
 
 
 # ---------------------------------------------------------------------------
@@ -1180,11 +1236,13 @@ class ExtractResponse(BaseModel):
 
 class ConfirmRequest(BaseModel):
     descriptions: list[str] = Field(..., min_length=1)
+    forecast_horizon_months: int | None = Field(None)  # optional; report_agent clamps to 1..12 (MODEL.md §2.2)
 
 class RefineRequest(BaseModel):
     sessionId:           str | None = Field(None)
     descriptions:        list[str]  = Field(..., min_length=1)
     initialDescriptions: list[str]  = Field(default_factory=list)
+    forecast_horizon_months: int | None = Field(None)
 
 
 # ---------------------------------------------------------------------------
@@ -1210,7 +1268,10 @@ def post_extract(request: ExtractRequest) -> JSONResponse:
 @router.post("/api/confirm")
 def post_confirm(request: ConfirmRequest) -> JSONResponse:
     try:
-        result = confirm_descriptions(request.descriptions)
+        result = confirm_descriptions(
+            request.descriptions,
+            forecast_horizon_months=request.forecast_horizon_months,
+        )
         return JSONResponse(content=result)
     except BusinessRejectedError as exc:
         return JSONResponse(status_code=422,
@@ -1228,6 +1289,7 @@ def post_refine(request: RefineRequest) -> JSONResponse:
             session_id=request.sessionId,
             new_descriptions=request.descriptions,
             initial_descriptions=request.initialDescriptions or None,
+            forecast_horizon_months=request.forecast_horizon_months,
         )
         return JSONResponse(content=result)
     except BusinessRejectedError as exc:
