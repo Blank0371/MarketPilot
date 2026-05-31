@@ -269,22 +269,39 @@ def write_mock_artifacts(timeseries: dict[str, float]) -> None:
 # ---------------------------------------------------------------------------
 # Artifact parsing (normalize Sybilion shapes -> internal shape)
 # ---------------------------------------------------------------------------
+def _quantile_at(quantiles: dict, target: float) -> float | None:
+    best_value: float | None = None
+    best_dist: float | None = None
+    for key, value in (quantiles or {}).items():
+        try:
+            key_f = float(key)
+            value_f = float(value)
+        except (TypeError, ValueError):
+            continue
+        dist = abs(key_f - target)
+        if best_dist is None or dist < best_dist:
+            best_dist, best_value = dist, value_f
+    return best_value
+
+
 def parse_forecast_artifact(raw: dict) -> list[dict]:
-    """Read ``data.forecast_series[date].quantile_forecast`` -> [{date,forecast,low,high}]."""
     series = (raw or {}).get("data", {}).get("forecast_series", {})
     out: list[dict] = []
     for d in sorted(series):
         point = series[d]
         q = point.get("quantile_forecast", {})
-        base = float(point.get("forecast", q.get(Q_MID)))
-        out.append(
-            {
-                "date": d,
-                "forecast": round(base, 2),
-                "low": round(float(q.get(Q_LOW, base)), 2),
-                "high": round(float(q.get(Q_HIGH, base)), 2),
-            }
-        )
+
+        base_raw = point.get("forecast")
+        base = float(base_raw) if base_raw is not None else (_quantile_at(q, 0.5) or 0.0)
+
+        low = _quantile_at(q, 0.1)
+        high = _quantile_at(q, 0.9)
+        low = base if low is None else low
+        high = base if high is None else high
+        low = max(0.0, low)
+        high = max(high, base)
+
+        out.append({"date": d, "forecast": round(base, 2), "low": round(low, 2), "high": round(high, 2)})
     if not out:
         raise ValueError("forecast artifact has no forecast_series points")
     return out
