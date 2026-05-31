@@ -590,8 +590,9 @@ def _collect_allowed_numbers(payload: dict) -> set[int]:
 
     def add(x: float) -> None:
         try:
-            allowed.add(int(round(float(x))))
-            allowed.add(int(round(float(x) * 100)))   # the percentage form of a fraction
+            v = float(x)
+            for n in (v, abs(v), v * 100, abs(v) * 100):
+                allowed.add(int(round(n)))
         except (TypeError, ValueError):
             pass
 
