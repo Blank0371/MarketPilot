@@ -16,13 +16,7 @@ This README reflects the **current code/runtime behavior**.
 - Idea input -> description extraction (`/api/extract`)
 - Description confirmation -> translation pipeline (`/api/confirm`)
 - Data-engineer time-series endpoint (`/data/timeseries`)
-- Frontend dashboard with two data modes:
-  - `mock` (default)
-  - `endpoint` (calls backend at `:8003`)
-
-Important:
-- `report_agent.py` and `sybilion_client.py` exist in the repo, but are not the primary path started by `start.sh`.
-- Frontend what-if and add-factor flows are still mock-driven.
+- Frontend dashboard connected to backend pipeline (`:8003`)
 
 ---
 
@@ -130,13 +124,9 @@ npm run dev
 
 ---
 
-## 7. Frontend mode switch
+## 7. Frontend
 
-On the main page, use the `Data mode` toggle:
-- `mock` -> local mock API flow
-- `endpoint` -> real calls to backend (`http://127.0.0.1:8003`)
-
-If you want to test backend pipeline, switch to `endpoint`.
+Frontend and backend are wired in the running app flow.
 
 ---
 

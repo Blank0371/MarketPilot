@@ -8,17 +8,9 @@ MarketPilot is currently split into:
 
 - `backend/data_engineer.py` — FastAPI Data-Engineer agent. Returns a mock 60-month seasonal ice cream time series.
 - `backend/translation_agent.py` — FastAPI Translation agent. Extracts descriptions and keywords via Featherless, with deterministic fallback when no API key is present.
-- `frontend/` — React/TanStack/Vite frontend. Currently mock-driven through `frontend/src/lib/mockApi.ts`.
+- `frontend/` — React/TanStack/Vite frontend connected to the backend pipeline.
 - `mock/` — committed mock data used by backend agents.
 - `tests/` — Python tests for the implemented backend agents.
-
-Not implemented yet:
-
-- unified `backend/main.py` orchestrator
-- Sybilion client/report agent
-- `/api/status/{job_id}`
-- `/api/result/{job_id}`
-- real frontend-to-backend wiring
 
 ## Environment Variables
 
@@ -135,7 +127,7 @@ Lint:
 npm run lint
 ```
 
-Important: the frontend currently uses mock APIs from `frontend/src/lib/mockApi.ts`. It does not call the Python backend yet.
+Important: frontend run path is backend-connected at `http://127.0.0.1:8003`.
 
 ## Current Local Demo Paths
 
@@ -176,22 +168,6 @@ uvicorn backend.translation_agent:app --reload --port 8003
 
 Run the two `uvicorn` commands in separate terminals.
 
-## Notes For Integration
+## Notes
 
-The canonical product flow is documented in `FLOW_AND_AGENTS.md`.
-
-The intended backend routes are:
-
-- `POST /api/extract` — idea input to descriptions
-- `POST /api/confirm` — confirmed descriptions to async pipeline job
-- `GET /api/status/{job_id}` — pipeline status
-- `GET /api/result/{job_id}` — final report JSON
-- `GET /api/health` — health check
-
-Current reality:
-
-- `backend.translation_agent` implements `/api/extract`.
-- `backend.translation_agent` implements `/api/confirm`, but returns the Data-Engineer response synchronously, not `{ job_id }`.
-- The frontend does not call these routes yet.
-
-When integrating, align frontend types with the final report contract in `ARCHITECTURE.md`.
+Canonical product flow and contracts are documented in `FLOW_AND_AGENTS.md` and `ARCHITECTURE.md`.

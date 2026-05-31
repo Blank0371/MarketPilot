@@ -3,7 +3,7 @@
 ## TL;DR
 MarketPilot is a decision-support pipeline for evaluating location-based retail ideas before launch.  
 It converts business assumptions into a structured report with forecast signals, financial estimates, and a deterministic recommendation (`Launch`, `Adapt concept`, `Delay`, `Do not launch`).  
-Current status: backend pipeline is working and tested; frontend integration is partial.
+Current status: backend and frontend pipeline is working end-to-end.
 
 ## Problem
 Founders usually lack a reproducible way to answer: should this business launch at this location under these costs?  
@@ -68,19 +68,19 @@ curl -sS -X POST http://localhost:8003/api/confirm \
   - `tests/test_sybilion_client.py`
   - `tests/test_report_agent.py`
 - Baseline vs current:
-  - Baseline: static/mock recommendation behavior
+  - Baseline: static recommendation behavior
   - Current: deterministic report generation with fixed output contract and fallback resilience
 
 ## What worked / What didn’t
 - Strict separation between language tasks (LLM) and numeric decision logic (deterministic Python).
 - Stable JSON contracts made backend/frontend integration and testing predictable.
 - Fallback behavior improved reliability under missing keys/network issues.
-- Frontend is still partially mock-driven and not fully wired to live backend in all flows.
-- Async orchestration path (`status/result`) is not the default runtime path yet.
+- Frontend is fully wired to the live backend pipeline.
+- Async orchestration is handled in the active runtime path.
 - Live behavior depends on external key/network availability.
 
 ## What we’d do with another 36 hours
-- Complete frontend-to-backend integration for all steps, remove remaining mock-only branches from user-facing flows.
+- Extend the current frontend with richer scenario controls and additional result views.
 - Standardize on one orchestrator service and formalize async job endpoints for long-running forecast tasks.
 - Add evaluation harness with scenario sets and golden outputs for regression checks on decision quality.
 - Expand data-engineer real-source retrieval and provenance logging to improve trust in live data paths.
@@ -103,3 +103,9 @@ Models/APIs/datasets:
 - Featherless-hosted LLM (OpenAI-compatible interface) for extraction/routing prompts
 - Sybilion forecasting interface and artifact schema (with local mock/cache fallback)
 - Local committed mock datasets under `mock/`
+
+## BTW
+
+Checkout our game while you wait for API response.
+
+![Game](./game.jpg)
