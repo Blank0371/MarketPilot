@@ -7,6 +7,7 @@ import { PitchStep } from "@/components/PitchStep";
 import { ConfirmDescriptions } from "@/components/ConfirmDescriptions";
 import { PollingLoader } from "@/components/PollingLoader";
 import { ResultsDashboard } from "@/components/ResultsDashboard";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import {
   exampleChips,
   heroCopy,
@@ -274,7 +275,9 @@ function Index() {
             )}
 
             {phase === "results" && report && (
-              <ResultsDashboard report={report} />
+              <ErrorBoundary onReset={() => setPhase("confirm")}>
+                <ResultsDashboard report={report} />
+              </ErrorBoundary>
             )}
           </div>
         </section>

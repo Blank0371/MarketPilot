@@ -97,6 +97,25 @@ export async function extractDescriptionsFromEndpoint(
   return data as ExtractDescriptionsResponse;
 }
 
+// ─── Full-report shape guard ──────────────────────────────────────────────────
+// Must be declared before confirmDescriptionsWithEndpoint which calls it.
+
+const VALID_LABELS = new Set<DecisionLabel>(["Launch", "Adapt concept", "Delay", "Do not launch"]);
+
+function isFullReport(data: unknown): data is Report {
+  if (typeof data !== "object" || data === null) return false;
+  const d = data as Record<string, unknown>;
+  if (typeof d.decision !== "object" || d.decision === null) return false;
+  const dec = d.decision as Record<string, unknown>;
+  // Only accept if label is a known display label — backend codes like "no-go"
+  // are not in DecisionOverview's STYLE map and would cause a hard crash.
+  if (!VALID_LABELS.has(dec.label as DecisionLabel)) return false;
+  return (
+    typeof d.financials === "object" && d.financials !== null &&
+    typeof d.reason === "object" && d.reason !== null
+  );
+}
+
 // ─── Confirmation endpoint ────────────────────────────────────────────────────
 
 const CONFIRM_TIMEOUT_MS = 1_200_000; // 20 minutes — Sybilion pipeline can be slow
@@ -157,9 +176,11 @@ export async function confirmDescriptionsWithEndpoint(
   }
 
   // ── Format detection ────────────────────────────────────────────────────────
-  // If the response already has a `decision` field it's the new full Report shape.
-  if ("decision" in data && (data as Record<string, unknown>).decision) {
-    return data as Report;
+  // Only treat as full Report if decision.label is a known display label — the
+  // backend might send internal codes ("no-go") which DecisionOverview doesn't
+  // have a style entry for, causing a hard crash.
+  if (isFullReport(data)) {
+    return data;
   }
 
   // Otherwise it's the legacy judgment format — adapt it.
@@ -169,10 +190,16 @@ export async function confirmDescriptionsWithEndpoint(
 // ─── Adapter: legacy backend format → Report ─────────────────────────────────
 
 const VERDICT_MAP: Record<string, DecisionLabel> = {
-  go:      "Launch",
-  "no-go": "Do not launch",
-  adapt:   "Adapt concept",
-  delay:   "Delay",
+  // backend codes
+  go:               "Launch",
+  "no-go":          "Do not launch",
+  adapt:            "Adapt concept",
+  delay:            "Delay",
+  // in case backend sends the display label directly
+  "Launch":         "Launch",
+  "Do not launch":  "Do not launch",
+  "Adapt concept":  "Adapt concept",
+  "Delay":          "Delay",
 };
 
 const RISK_MAP: Record<DecisionLabel, RiskLevel> = {
@@ -192,7 +219,13 @@ const BREAK_EVEN_MAP: Record<DecisionLabel, number> = {
 function adaptLegacyResponse(raw: LegacyConfirmResponse): Report {
   const j = raw.judgment ?? {};
 
+  // VERDICT_MAP handles both backend codes ("no-go") and display labels ("Do not launch").
   const label: DecisionLabel = VERDICT_MAP[j.verdict ?? ""] ?? "Adapt concept";
+
+  // Safely convert unknown values to string arrays — backend might send null,
+  // a plain string, or an object instead of string[].
+  const toStrArr = (v: unknown): string[] =>
+    Array.isArray(v) ? (v as string[]).map(String) : typeof v === "string" && v ? [v] : [];
 
   // Backend score may be 0-1, 0-10, or 0-100; normalise to 0-100.
   const rawScore = j.score ?? 50;
@@ -222,10 +255,10 @@ function adaptLegacyResponse(raw: LegacyConfirmResponse): Report {
     investment_breakdown: undefined,
     backtest: null,
     reason: {
-      main_reason: j.summary ?? "",
-      positive_factors:    (j.strengths      as string[] | undefined) ?? [],
-      negative_factors:    (j.risks          as string[] | undefined) ?? [],
-      recommended_actions: j.recommendation ? [j.recommendation]     : [],
+      main_reason: typeof j.summary === "string" ? j.summary : "",
+      positive_factors:    toStrArr(j.strengths),
+      negative_factors:    toStrArr(j.risks),
+      recommended_actions: toStrArr(j.recommendation),
     },
   };
 }
