@@ -174,7 +174,7 @@ export function HeroRevenueCard() {
             Confidence
           </p>
           <p className="mt-1.5 text-xl font-semibold tabular-nums text-primary">
-            74%
+            90%
           </p>
         </div>
         <div>
