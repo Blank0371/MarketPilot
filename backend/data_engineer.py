@@ -36,6 +36,9 @@ from fastapi import APIRouter, FastAPI
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
+from backend.data_engineer_core.config import settings as core_settings
+from backend.data_engineer_core.provider import CoreRealDataProvider
+from backend.data_engineer_core.registry.loader import RegistryLoader
 from backend.data_sources import (
     CONNECTED_SOURCES,
     SOURCE_QUALITIES,
@@ -64,6 +67,10 @@ _SERIES_TREND_PER_MONTH = 0.6  # mild upward drift
 _SERIES_SEASONAL_AMPLITUDE = 0.45  # +/-45% swing → strong, visible seasonality
 _SERIES_NOISE = 3.0  # +/- month-to-month jitter so it looks real
 _SERIES_SEED = 20260530  # fixed seed → deterministic file & stable tests
+
+REAL_DATA_ENABLED = os.getenv("REAL_DATA_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}
+_REAL_PROVIDER: CoreRealDataProvider | None = None
+_CORE_REGISTRY: RegistryLoader | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -545,21 +552,25 @@ _LLM_ROUTING_SYSTEM = (
 )
 
 
-def _llm_routing_user(description: str, sources: list[dict]) -> str:
+def _llm_routing_user(description: str, sources: list[dict], dataset_catalog: list[dict]) -> str:
     categories = "\n".join(f"- {c}" for c in (*SUPPORTED_CATEGORIES, "unsupported"))
     return (
         "Supported categories:\n" + categories + "\n\n"
         "Rules:\n"
         "- Do not invent numbers or a time series.\n"
         "- Select source_id only from the connected sources below (or null).\n"
+        "- Select dataset_id only from the datasets catalog below (or null).\n"
+        "- Select metric only from the selected dataset metrics (or null).\n"
         "- If no real/proxy source fits, pick the deterministic mock source for the closest category.\n"
         '- If it cannot map to any supported category, use category "unsupported", '
         'source_quality "none", source_id null.\n'
         '- aggregation must be "monthly".\n\n'
         f"Connected sources:\n{json.dumps(sources, indent=2)}\n\n"
+        f"Datasets catalog:\n{json.dumps(dataset_catalog, indent=2)}\n\n"
         f"Description:\n{description}\n\n"
         "Return exactly this JSON shape:\n"
         '{"category":"...","source_id":"... or null","source_quality":"exact|proxy|mock|none",'
+        '"dataset_id":"... or null","metric":"... or null",'
         '"aggregation":"monthly","unit_hint":"...","confidence":"low|medium|high",'
         '"fallback_required":true,"reason":"short explanation"}'
     )
@@ -572,7 +583,7 @@ def _extract_json_object(text: str) -> dict:
     return json.loads(text[start: end + 1])
 
 
-def _validate_llm_routing(data: dict) -> dict | None:
+def _validate_llm_routing_ex(data: dict) -> tuple[dict | None, str]:
     """Validate + sanitise an LLM routing dict; return None to reject it.
 
     Enforces the hard relevance rules: category must be supported (or the
@@ -581,10 +592,10 @@ def _validate_llm_routing(data: dict) -> dict | None:
     LLM can therefore never inject an unknown category, source, or any number.
     """
     if not isinstance(data, dict):
-        return None
+        return None, "llm_payload_not_object"
     category = str(data.get("category", "")).strip().lower()
     if category != "unsupported" and not is_supported_category(category):
-        return None
+        return None, f"invalid_category:{category or 'empty'}"
 
     quality = str(data.get("source_quality", "")).strip().lower()
     if quality not in SOURCE_QUALITIES:
@@ -598,8 +609,36 @@ def _validate_llm_routing(data: dict) -> dict | None:
             source_id = None
             quality = "none" if category == "unsupported" else "mock"
 
+    dataset_id = data.get("dataset_id")
+    metric = data.get("metric")
+    dataset_id = dataset_id.strip() if isinstance(dataset_id, str) else None
+    metric = metric.strip() if isinstance(metric, str) else None
+    if dataset_id or metric:
+        if not (dataset_id and metric):
+            return None, "dataset_metric_pair_incomplete"
+        catalog = {item["dataset_id"]: item for item in _llm_dataset_catalog()}
+        ds = catalog.get(dataset_id)
+        if ds is None:
+            return None, f"dataset_not_in_catalog:{dataset_id}"
+        if metric not in ds["metrics"]:
+            return None, f"metric_not_in_dataset:{metric}"
+        if source_id is not None and ds["source_id"] != source_id:
+            return None, f"source_dataset_mismatch:{source_id}!={ds['source_id']}"
+
     reason = str(data.get("reason", "")).strip() or "LLM routing"
-    return {"category": category, "source_id": source_id, "source_quality": quality, "reason": reason}
+    return {
+        "category": category,
+        "source_id": source_id,
+        "source_quality": quality,
+        "dataset_id": dataset_id,
+        "metric": metric,
+        "reason": reason,
+    }, "ok"
+
+
+def _validate_llm_routing(data: dict) -> dict | None:
+    routing, _reason = _validate_llm_routing_ex(data)
+    return routing
 
 
 def _llm_resolve_data_request(description: str, sources: list[dict]) -> dict | None:
@@ -624,17 +663,32 @@ def _llm_resolve_data_request(description: str, sources: list[dict]) -> dict | N
     try:
         raw = client.chat(
             _LLM_ROUTING_SYSTEM,
-            _llm_routing_user(description, sources),
+            _llm_routing_user(description, sources, _llm_dataset_catalog()),
             temperature=0.0,
             max_tokens=200,
         )
+        logger.info("LLM routing raw response: %s", raw[:800].replace("\n", " "))
         data = _extract_json_object(raw)
     except Exception as exc:
         logger.warning("LLM routing failed for %r (%s); using keyword fallback", description, exc)
         return None
-    routing = _validate_llm_routing(data)
+    routing, reason = _validate_llm_routing_ex(data)
     if routing is None:
-        logger.warning("LLM routing for %r rejected by validation; using keyword fallback", description)
+        logger.warning(
+            "LLM routing for %r rejected by validation (%s); using keyword fallback. payload=%s",
+            description,
+            reason,
+            json.dumps(data, ensure_ascii=False)[:800],
+        )
+    else:
+        logger.info(
+            "LLM routing accepted: category=%s source_id=%s dataset_id=%s metric=%s quality=%s",
+            routing.get("category"),
+            routing.get("source_id"),
+            routing.get("dataset_id"),
+            routing.get("metric"),
+            routing.get("source_quality"),
+        )
     return routing
 
 
@@ -691,6 +745,52 @@ def resolve_series(description: str, key_word: list[str] | None = None) -> Serie
     )
 
 
+def _provider() -> CoreRealDataProvider:
+    global _REAL_PROVIDER
+    if _REAL_PROVIDER is None:
+        _REAL_PROVIDER = CoreRealDataProvider()
+    return _REAL_PROVIDER
+
+
+def _core_loader() -> RegistryLoader:
+    global _CORE_REGISTRY
+    if _CORE_REGISTRY is None:
+        _CORE_REGISTRY = RegistryLoader(core_settings.sources_path, core_settings.datasets_path)
+    return _CORE_REGISTRY
+
+
+def _llm_dataset_catalog() -> list[dict]:
+    loader = _core_loader()
+    datasets: list[dict] = []
+    for ds in loader.load_datasets():
+        if not ds.verified or not ds.time_series:
+            continue
+        src = loader.get_source(ds.source_id)
+        if src.auth_required or src.access != "public":
+            continue
+        datasets.append(
+            {
+                "dataset_id": ds.id,
+                "source_id": ds.source_id,
+                "domain": ds.domain,
+                "metrics": ds.metrics,
+            }
+        )
+    return datasets
+
+
+def _build_real_query(description: str, key_word: list[str]) -> str:
+    """Build a stable query string for the real-data provider."""
+    kws = ", ".join(dict.fromkeys([item.strip() for item in key_word if item.strip()]))
+    time_window = "last 10 years"
+    if kws:
+        return (
+            f"{description}. Return monthly time series for {time_window}. "
+            f"Use retail/planning-relevant metric. Context keywords: {kws}"
+        )
+    return f"{description}. Return monthly time series for {time_window}."
+
+
 # ---------------------------------------------------------------------------
 # Core
 # ---------------------------------------------------------------------------
@@ -700,15 +800,16 @@ def _build_metadata(description: str, key_word: list[str]) -> dict:
     title = description.strip()
     meta_description = title if title.endswith(".") else f"{title}."
 
-    keywords: list[str] = []
+    # keywords: list[str] = []
     seen: set[str] = set()
     for candidate in (*key_word, *ENRICHMENT_KEYWORDS):
         cleaned = candidate.strip()
         if cleaned and cleaned.lower() not in seen:
             seen.add(cleaned.lower())
-            keywords.append(cleaned)
+            # keywords.append(cleaned)
 
-    return {"title": title, "description": meta_description, "keywords": keywords}
+    # return {"title": title, "description": meta_description, "keywords": keywords}
+    return {"description": meta_description}
 
 
 def get_timeseries(description: str, key_word: list[str] | None = None) -> dict:
@@ -721,7 +822,84 @@ def get_timeseries(description: str, key_word: list[str] | None = None) -> dict:
     """
     key_word = list(key_word or [])
 
+    resolution: SeriesResolution | None = None
+    meta_keywords = list(key_word)
+    if REAL_DATA_ENABLED:
+        llm_route = _llm_resolve_data_request(description, CONNECTED_SOURCES)
+        if llm_route and llm_route.get("dataset_id") and llm_route.get("metric"):
+            real_result = _provider().fetch_by_selection(
+                dataset_id=llm_route["dataset_id"],
+                metric=llm_route["metric"],
+                raw_query=description,
+                last_years=5,
+            )
+            if real_result is not None:
+                diagnostics = validate_timeseries(real_result.series)
+                if not diagnostics:
+                    logger.info(
+                        "data_engineer provenance=REAL_LLM source=%s dataset=%s metric=%s",
+                        real_result.source_ref,
+                        llm_route["dataset_id"],
+                        llm_route["metric"],
+                    )
+                    logger.info(
+                        "data-request %r -> real(LLM) source=%s dataset=%s metric=%s",
+                        description,
+                        real_result.source_ref,
+                        llm_route["dataset_id"],
+                        llm_route["metric"],
+                    )
+                    return {
+                        "timeseries_metadata": _build_metadata(
+                            description,
+                            # meta_keywords
+                            # + [
+                            #     f"source:{real_result.source_ref}",
+                            #     f"dataset:{llm_route['dataset_id']}",
+                            #     f"metric:{llm_route['metric']}",
+                            #     # "provenance:real",
+                            # ],
+                        ),
+                        "timeseries": real_result.series,
+                    }
+
+        query = _build_real_query(description, key_word)
+        real_result = _provider().fetch(query)
+        if real_result is not None:
+            diagnostics = validate_timeseries(real_result.series)
+            if not diagnostics:
+                logger.info(
+                    "data_engineer provenance=REAL_PLANNER source=%s status=%s",
+                    real_result.source_ref,
+                    real_result.status,
+                )
+                logger.info(
+                    "data-request %r -> real source=%s status=%s",
+                    description,
+                    real_result.source_ref,
+                    real_result.status,
+                )
+                return {
+                    "timeseries_metadata": _build_metadata(
+                        description,
+                        meta_keywords + [f"source:{real_result.source_ref}", "provenance:real"],
+                    ),
+                    "timeseries": real_result.series,
+                }
+            logger.warning(
+                "real data rejected for %r (source=%s): %s",
+                description,
+                real_result.source_ref,
+                "; ".join(diagnostics),
+            )
+
     resolution = resolve_series(description, key_word)
+    logger.info(
+        "data_engineer provenance=MOCK category=%s source=%s quality=%s",
+        resolution.category,
+        resolution.source_id,
+        resolution.source_quality,
+    )
     logger.info(
         "data-request %r -> category=%s source=%s quality=%s (%s)",
         description, resolution.category, resolution.source_id,
@@ -734,7 +912,7 @@ def get_timeseries(description: str, key_word: list[str] | None = None) -> dict:
         logger.warning("timeseries diagnostics for %r: %s", description, "; ".join(diagnostics))
 
     return {
-        "timeseries_metadata": _build_metadata(description, key_word),
+        "timeseries_metadata": _build_metadata(description, meta_keywords + ["provenance:mock"]),
         "timeseries": series,
     }
 
