@@ -1012,7 +1012,11 @@ def _run_pipeline(
             else:
                 agg_fc_series[dt] = val
         sig = r["signals"]
-        all_drivers.extend(sig.get("drivers", sig.get("external_signals", [])))
+        all_drivers.extend(
+            sig.get("drivers", []) or
+            sig.get("data", {}).get("signals", []) or
+            sig.get("external_signals", [])
+        )
 
     # Dedupe drivers by name, keeping highest importance
     seen_drivers: dict[str, dict] = {}
