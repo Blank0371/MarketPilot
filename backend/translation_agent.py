@@ -1317,6 +1317,7 @@ app.add_middleware(
         "http://127.0.0.1:5173",
         "http://localhost:3000",
         "http://127.0.0.1:3000",
+        "https://frontend-production-c055.up.railway.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
