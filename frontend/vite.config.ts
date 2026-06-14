@@ -7,7 +7,12 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
-  server:{
-    allowedHosts:[".up.railway.app"]
+  tanstackStart: {
+    server: { entry: "server" },
   },
+  vite: {
+    preview: {
+      allowedHosts: [".up.railway.app"]
+    }
+  }
 });
