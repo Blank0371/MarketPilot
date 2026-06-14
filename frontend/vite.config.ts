@@ -12,7 +12,7 @@ export default defineConfig({
   },
   vite: {
     preview: {
-      allowedHosts: [".up.railway.app"]
+      allowedHosts: ["all"]
     }
   }
 });
