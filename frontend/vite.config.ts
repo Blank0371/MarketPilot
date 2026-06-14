@@ -14,5 +14,8 @@ export default defineConfig({
     preview: {
       allowedHosts: ["all"]
     }
+  },
+  nitro: {
+    preset: "node-server"
   }
 });
