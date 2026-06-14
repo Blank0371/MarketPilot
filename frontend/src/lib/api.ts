@@ -48,7 +48,7 @@ export type LegacyConfirmResponse = {
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-const BACKEND_BASE = "http://127.0.0.1:8003";
+const BACKEND_BASE = import.meta.env.VITE_BACKEND_URL ?? "http://127.0.0.1:8003";
 
 // ─── Extraction endpoint ──────────────────────────────────────────────────────
 
