@@ -1,6 +1,6 @@
 import re
 
-from backend.data_engineer_core.schemas.request_schema import GeoRequest, TimeRange, UserDataRequest
+from data_engineer_core.schemas.request_schema import GeoRequest, TimeRange, UserDataRequest
 
 
 class IntentExtractor:

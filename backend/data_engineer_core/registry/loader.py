@@ -2,7 +2,7 @@ from pathlib import Path
 
 import yaml
 
-from backend.data_engineer_core.schemas.source_schema import DatasetDefinition, SourceDefinition
+from data_engineer_core.schemas.source_schema import DatasetDefinition, SourceDefinition
 
 
 class RegistryLoader:

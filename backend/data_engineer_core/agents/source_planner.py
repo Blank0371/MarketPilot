@@ -1,6 +1,6 @@
-from backend.data_engineer_core.registry.loader import RegistryLoader
-from backend.data_engineer_core.schemas.plan_schema import RejectedCandidate, SourceCandidate, SourcePlan
-from backend.data_engineer_core.schemas.request_schema import UserDataRequest
+from data_engineer_core.registry.loader import RegistryLoader
+from data_engineer_core.schemas.plan_schema import RejectedCandidate, SourceCandidate, SourcePlan
+from data_engineer_core.schemas.request_schema import UserDataRequest
 
 
 class SourcePlanner:

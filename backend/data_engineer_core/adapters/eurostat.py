@@ -5,7 +5,7 @@ from datetime import date
 import re
 import requests
 
-from backend.data_engineer_core.schemas.result_schema import TimeSeriesPoint
+from data_engineer_core.schemas.result_schema import TimeSeriesPoint
 
 
 @dataclass(frozen=True)

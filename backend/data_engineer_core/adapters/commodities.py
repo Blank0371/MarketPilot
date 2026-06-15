@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 import requests
 
-from backend.data_engineer_core.schemas.result_schema import TimeSeriesPoint
+from data_engineer_core.schemas.result_schema import TimeSeriesPoint
 
 
 @dataclass(frozen=True)

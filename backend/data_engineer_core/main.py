@@ -1,16 +1,16 @@
 from fastapi import FastAPI
 
-from backend.data_engineer_core.adapters.commodities import CommodityConnector
-from backend.data_engineer_core.adapters.eurostat import EurostatAdapter
-from backend.data_engineer_core.agents.code_planner import CodePlanner
-from backend.data_engineer_core.agents.intent_extractor import IntentExtractor
-from backend.data_engineer_core.agents.source_planner import SourcePlanner
-from backend.data_engineer_core.config import settings
-from backend.data_engineer_core.registry.loader import RegistryLoader
-from backend.data_engineer_core.sandbox.runner import SandboxRunner
-from backend.data_engineer_core.schemas.request_schema import QueryInput
-from backend.data_engineer_core.schemas.result_schema import QueryMetadata, QueryResponse
-from backend.data_engineer_core.validation.result_validator import ResultValidator
+from data_engineer_core.adapters.commodities import CommodityConnector
+from data_engineer_core.adapters.eurostat import EurostatAdapter
+from data_engineer_core.agents.code_planner import CodePlanner
+from data_engineer_core.agents.intent_extractor import IntentExtractor
+from data_engineer_core.agents.source_planner import SourcePlanner
+from data_engineer_core.config import settings
+from data_engineer_core.registry.loader import RegistryLoader
+from data_engineer_core.sandbox.runner import SandboxRunner
+from data_engineer_core.schemas.request_schema import QueryInput
+from data_engineer_core.schemas.result_schema import QueryMetadata, QueryResponse
+from data_engineer_core.validation.result_validator import ResultValidator
 
 app = FastAPI(title="Data Engineer Agent", version="0.1.0")
 

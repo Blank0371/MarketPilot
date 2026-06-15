@@ -1,6 +1,6 @@
-from backend.data_engineer_core.schemas.plan_schema import SourcePlan
-from backend.data_engineer_core.schemas.request_schema import UserDataRequest
-from backend.data_engineer_core.schemas.result_schema import QueryMetadata, QueryResponse, TimeSeriesPoint
+from data_engineer_core.schemas.plan_schema import SourcePlan
+from data_engineer_core.schemas.request_schema import UserDataRequest
+from data_engineer_core.schemas.result_schema import QueryMetadata, QueryResponse, TimeSeriesPoint
 
 
 class ResultValidator:
