@@ -3,14 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 
-from backend.data_engineer_core.adapters.commodities import CommodityConnector
-from backend.data_engineer_core.adapters.eurostat import EurostatAdapter
-from backend.data_engineer_core.adapters.statistik_austria import StatistikAustriaAdapter
-from backend.data_engineer_core.agents.intent_extractor import IntentExtractor
-from backend.data_engineer_core.agents.source_planner import SourcePlanner
-from backend.data_engineer_core.config import settings
-from backend.data_engineer_core.registry.loader import RegistryLoader
-from backend.data_engineer_core.schemas.result_schema import TimeSeriesPoint
+from data_engineer_core.adapters.commodities import CommodityConnector
+from data_engineer_core.adapters.eurostat import EurostatAdapter
+from data_engineer_core.adapters.statistik_austria import StatistikAustriaAdapter
+from data_engineer_core.agents.intent_extractor import IntentExtractor
+from data_engineer_core.agents.source_planner import SourcePlanner
+from data_engineer_core.config import settings
+from data_engineer_core.registry.loader import RegistryLoader
+from data_engineer_core.schemas.result_schema import TimeSeriesPoint
 
 
 @dataclass
