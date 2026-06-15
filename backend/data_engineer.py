@@ -36,10 +36,10 @@ from fastapi import APIRouter, FastAPI
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
-from backend.data_engineer_core.config import settings as core_settings
-from backend.data_engineer_core.provider import CoreRealDataProvider
-from backend.data_engineer_core.registry.loader import RegistryLoader
-from backend.data_sources import (
+from data_engineer_core.config import settings as core_settings
+from data_engineer_core.provider import CoreRealDataProvider
+from data_engineer_core.registry.loader import RegistryLoader
+from data_sources import (
     CONNECTED_SOURCES,
     SOURCE_QUALITIES,
     SUPPORTED_CATEGORIES,
@@ -660,7 +660,7 @@ def _llm_resolve_data_request(description: str, sources: list[dict]) -> dict | N
     if not os.getenv("FEATHERLESS_API_KEY"):
         return None
     try:
-        from backend.translation_agent import FeatherlessClient  # reuse Block 3 client
+        from translation_agent import FeatherlessClient  # reuse Block 3 client
     except Exception as exc:  # pragma: no cover - import guard
         logger.warning("FeatherlessClient unavailable (%s); skipping LLM routing", exc)
         return None
