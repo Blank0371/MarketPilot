@@ -896,7 +896,7 @@ def call_data_engineer(description: str, key_word: list[str]) -> dict:
                 return r.json()
         except Exception as exc:
             logger.warning("DE HTTP call failed (%s); falling back to in-process", exc)
-    from backend.data_engineer import get_timeseries
+    from data_engineer import get_timeseries
     return get_timeseries(description)
 
 
@@ -985,8 +985,8 @@ def _run_pipeline(
 
     logger.info("STEP 6 | building deterministic report via build_report")
 
-    from backend.report_agent import build_report as _build_report
-    from backend.sybilion_client import parse_forecast_artifact
+    from report_agent import build_report as _build_report
+    from sybilion_client import parse_forecast_artifact
 
     # Агрегируем драйверы из всех джобов (у каждого свои external_signals)
     all_drivers: list[dict] = []
