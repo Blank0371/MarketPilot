@@ -50,7 +50,7 @@ from fastapi import APIRouter, FastAPI
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from backend import sybilion_client
+from . import sybilion_client
 
 logger = logging.getLogger("marketpilot.report_agent")
 
@@ -664,7 +664,7 @@ def _template_reason(payload: dict, drivers: list[dict]) -> dict:
 def _llm_client():
     """A Featherless client if a key is configured, else None. Reuses translation_agent's client (no new HTTP client)."""
     try:
-        from backend.translation_agent import FeatherlessClient  # lazy: keep report_agent light when LLM is unused
+        from translation_agent import FeatherlessClient  # lazy: keep report_agent light when LLM is unused
     except Exception as exc:  # noqa: BLE001
         logger.warning("could not import FeatherlessClient (%s)", exc)
         return None
@@ -1213,7 +1213,7 @@ ICE_CREAM_PROFILE = {
 if __name__ == "__main__":  # pragma: no cover - manual run
     import json
 
-    from backend.data_engineer import _load_mock_timeseries
+    from data_engineer import _load_mock_timeseries
 
     demo = build_report(
         _load_mock_timeseries(),
